@@ -39,6 +39,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.PaddingValues
 import android.app.DownloadManager
 import android.content.Context
 import android.content.ContentValues
@@ -125,11 +128,10 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
         } ?: return false
         return true
     }
+    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            modifier = Modifier.height(44.dp),
             title = { Text("详情") },
-            windowInsets = WindowInsets(0),
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) } },
             actions = {
                 if (!editing) {
@@ -153,10 +155,10 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 }
             }
         )
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 16.dp + bottom)) {
             item {
                 if (!editing) {
-                    Text(item.name, style = MaterialTheme.typography.headlineMedium)
+                    Text(item.name, style = MaterialTheme.typography.displaySmall)
                 } else {
                     OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("名称") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp))
                 }
@@ -166,7 +168,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     if (editing) Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
                 } else if (item.imageUrls.size == 1) {
                     val url = item.imageUrls.first()
-                    Box(modifier = Modifier.fillMaxWidth().height(480.dp).clip(RoundedCornerShape(12.dp))) {
+                    Box(modifier = Modifier.fillMaxWidth().height(560.dp).clip(RoundedCornerShape(12.dp))) {
                         AsyncImage(
                             model = url,
                             contentDescription = null,
@@ -210,9 +212,9 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     }
                 } else {
                     val listState = rememberLazyListState()
-                    LazyRow(state = listState, modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyRow(state = listState, modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(item.imageUrls) { url ->
-                            Box(modifier = Modifier.width(400.dp).height(400.dp).clip(RoundedCornerShape(12.dp))) {
+                            Box(modifier = Modifier.width(480.dp).height(480.dp).clip(RoundedCornerShape(12.dp))) {
                                 AsyncImage(
                                     model = url,
                                     contentDescription = null,

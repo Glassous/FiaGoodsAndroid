@@ -53,6 +53,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -67,10 +70,11 @@ fun AuthScreen(vm: AuthViewModel, onVerified: () -> Unit, message: String? = nul
     val ctx = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(error) { if (error != null) snackbarHostState.showSnackbar(error!!) }
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
+    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }, contentWindowInsets = WindowInsets(0)) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             CenterAlignedTopAppBar(title = { Text("FiaGoods 验证") })
-            Column(modifier = Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(modifier = Modifier.fillMaxSize().padding(24.dp).padding(bottom = bottom), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (message != null) {
                     ElevatedCard(colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer), modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

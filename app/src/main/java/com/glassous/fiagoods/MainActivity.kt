@@ -1,11 +1,13 @@
 package com.glassous.fiagoods
 
 import android.os.Bundle
+import android.graphics.Color
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -13,6 +15,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.net.Uri
+import android.view.View
+import android.view.WindowManager
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import androidx.navigation.NavController
@@ -23,6 +27,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.glassous.fiagoods.ui.theme.FiaGoodsTheme
 import com.glassous.fiagoods.ui.DetailScreen
 import com.glassous.fiagoods.ui.GoodsViewModel
@@ -35,13 +41,21 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
+        window.navigationBarColor = Color.TRANSPARENT
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.isAppearanceLightNavigationBars = false
+        var flags = window.decorView.systemUiVisibility
+        flags = flags or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        window.decorView.systemUiVisibility = flags
         setContent {
             FiaGoodsTheme {
                 val navController = rememberNavController()
                 val vm: GoodsViewModel = viewModel()
                 val snackbarHostState = remember { SnackbarHostState() }
                 val startDest = if (SessionPrefs.isVerified(this)) "home" else "auth"
-                Scaffold(modifier = Modifier.fillMaxSize(), snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
+                Scaffold(modifier = Modifier.fillMaxSize(), snackbarHost = { SnackbarHost(snackbarHostState) }, contentWindowInsets = WindowInsets(0)) { innerPadding ->
                     NavHost(navController = navController, startDestination = startDest, modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                         composable(
                             route = "auth?msg={msg}",

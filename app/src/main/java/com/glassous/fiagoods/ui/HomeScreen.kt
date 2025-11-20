@@ -47,6 +47,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.ui.window.Dialog
 import java.util.UUID
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.PaddingValues
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -56,6 +60,7 @@ fun HomeScreen(
     onItemClick: (String) -> Unit,
     onAddItem: (CargoItem) -> Unit
 ) {
+    val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Column(modifier = Modifier.fillMaxSize()) {
         var query by remember { mutableStateOf("") }
         var searchOpen by remember { mutableStateOf(false) }
@@ -98,7 +103,7 @@ fun HomeScreen(
                 }
             } else {
                 val list = if (query.isBlank()) items else items.filter { it.name.contains(query, true) || it.category.contains(query, true) }
-                LazyColumn(modifier = Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(modifier = Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 12.dp + bottom)) {
                     items(list) { item ->
                         Card(elevation = CardDefaults.cardElevation(), modifier = Modifier.fillMaxWidth().clickable { onItemClick(item.id) }) {
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
