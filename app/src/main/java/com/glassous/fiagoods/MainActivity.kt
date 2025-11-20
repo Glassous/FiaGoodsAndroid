@@ -12,6 +12,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.net.Uri
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -40,13 +43,18 @@ class MainActivity : ComponentActivity() {
                 val startDest = if (SessionPrefs.isVerified(this)) "home" else "auth"
                 Scaffold(modifier = Modifier.fillMaxSize(), snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
                     NavHost(navController = navController, startDestination = startDest, modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                        composable("auth") {
+                        composable(
+                            route = "auth?msg={msg}",
+                            arguments = listOf(navArgument("msg") { type = NavType.StringType; defaultValue = "" })
+                        ) { backStackEntry ->
                             val authVm: AuthViewModel = viewModel()
+                            val msg = backStackEntry.arguments?.getString("msg").orEmpty()
+                            val displayMsg = msg.takeIf { it.isNotBlank() }
                             AuthScreen(vm = authVm, onVerified = {
                                 navController.navigate("home") {
                                     popUpTo("auth") { inclusive = true }
                                 }
-                            })
+                            }, message = displayMsg)
                         }
                         composable("home") {
                             val items by vm.items.collectAsState()
@@ -55,8 +63,9 @@ class MainActivity : ComponentActivity() {
                             val msg by vm.authInvalidMessage.collectAsState()
                             LaunchedEffect(msg) {
                                 if (msg != null) {
-                                    snackbarHostState.showSnackbar(msg!!)
-                                    navController.navigate("auth") {
+                                    val encoded = Uri.encode(msg!!)
+                                    vm.clearAuthMessage()
+                                    navController.navigate("auth?msg=$encoded") {
                                         popUpTo("home") { inclusive = true }
                                     }
                                 }

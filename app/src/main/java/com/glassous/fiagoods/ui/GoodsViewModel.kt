@@ -24,6 +24,7 @@ class GoodsViewModel : ViewModel() {
     fun refresh(context: Context) {
         viewModelScope.launch {
             _loading.value = true
+            _authInvalidMessage.value = null
             if (!SessionPrefs.isVerified(context)) {
                 _items.value = emptyList()
                 _loading.value = false
@@ -45,4 +46,6 @@ class GoodsViewModel : ViewModel() {
     }
 
     fun findById(id: String): CargoItem? = _items.value.firstOrNull { it.id == id }
+
+    fun clearAuthMessage() { _authInvalidMessage.value = null }
 }
