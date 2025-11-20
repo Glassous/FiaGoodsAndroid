@@ -14,6 +14,11 @@ val envLocal = Properties().apply {
 }
 val SUPABASE_URL: String = envLocal.getProperty("SUPABASE_URL", "")
 val SUPABASE_ANON_KEY: String = envLocal.getProperty("SUPABASE_ANON_KEY", "")
+val OSS_ENDPOINT: String = envLocal.getProperty("OSS_ENDPOINT", "")
+val OSS_BUCKET: String = envLocal.getProperty("OSS_BUCKET", "")
+val OSS_ACCESS_KEY_ID: String = envLocal.getProperty("OSS_ACCESS_KEY_ID", "")
+val OSS_ACCESS_KEY_SECRET: String = envLocal.getProperty("OSS_ACCESS_KEY_SECRET", "")
+val OSS_PUBLIC_BASE_URL: String = envLocal.getProperty("OSS_PUBLIC_BASE_URL", "")
 
 android {
     namespace = "com.glassous.fiagoods"
@@ -32,6 +37,11 @@ android {
 
         buildConfigField("String", "SUPABASE_URL", "\"$SUPABASE_URL\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$SUPABASE_ANON_KEY\"")
+        buildConfigField("String", "OSS_ENDPOINT", "\"$OSS_ENDPOINT\"")
+        buildConfigField("String", "OSS_BUCKET", "\"$OSS_BUCKET\"")
+        buildConfigField("String", "OSS_ACCESS_KEY_ID", "\"$OSS_ACCESS_KEY_ID\"")
+        buildConfigField("String", "OSS_ACCESS_KEY_SECRET", "\"$OSS_ACCESS_KEY_SECRET\"")
+        buildConfigField("String", "OSS_PUBLIC_BASE_URL", "\"$OSS_PUBLIC_BASE_URL\"")
     }
 
     buildTypes {
@@ -56,7 +66,7 @@ android {
     }
 }
 
-dependencies {
+    dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -74,8 +84,9 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.coil.compose)
     implementation(libs.androidx.security.crypto)
-    implementation(libs.androidx.graphics.shapes)
-    testImplementation(libs.junit)
+        implementation(libs.androidx.graphics.shapes)
+        implementation(libs.aliyun.oss)
+        testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

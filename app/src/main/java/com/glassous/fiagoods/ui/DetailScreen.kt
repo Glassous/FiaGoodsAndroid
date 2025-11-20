@@ -47,12 +47,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Checkbox
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import coil.compose.AsyncImage
+import androidx.compose.material3.LinearProgressIndicator
 import com.glassous.fiagoods.data.model.CargoItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<String, Any?>) -> Unit, onDelete: (String, (Boolean) -> Unit) -> Unit) {
+fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<String, Any?>) -> Unit, onDelete: (String, (Boolean) -> Unit) -> Unit, onAddImage: (Uri) -> Unit, onDeleteImage: (String) -> Unit, onAddImageWithProgress: (Uri, (Long, Long) -> Unit, (Boolean, String?) -> Unit) -> Unit, onDeleteImageWithProgress: (String, (Float) -> Unit, (Boolean, String?) -> Unit) -> Unit) {
     var previewUrl by remember { mutableStateOf<String?>(null) }
     val ctx = LocalContext.current
     var editing by remember { mutableStateOf(false) }
@@ -66,6 +69,30 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
     var brief by remember { mutableStateOf(item.brief) }
     var description by remember { mutableStateOf(item.description) }
     var specs by remember { mutableStateOf(item.specs) }
+    var deleteCandidateUrl by remember { mutableStateOf<String?>(null) }
+    var showUploadDialog by remember { mutableStateOf(false) }
+    var uploading by remember { mutableStateOf(false) }
+    var uploadProgress by remember { mutableStateOf(0f) }
+    var uploadError by remember { mutableStateOf<String?>(null) }
+    val pickNew = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            showUploadDialog = true
+            uploading = true
+            uploadProgress = 0f
+            uploadError = null
+            onAddImageWithProgress(uri, { current, total ->
+                uploadProgress = if (total > 0) current.toFloat() / total.toFloat() else 0f
+            }, { ok, err ->
+                uploading = false
+                if (ok) {
+                    showUploadDialog = false
+                } else {
+                    uploadError = err ?: "上传失败"
+                }
+            })
+        }
+    }
+    
     fun download(url: String, fileName: String) {
         val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val request = DownloadManager.Request(Uri.parse(url))
@@ -109,28 +136,42 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 }
             }
             item {
-                if (item.imageUrls.size <= 1) {
-                    val url = item.imageUrls.firstOrNull()
-                    if (url != null) {
+                if (item.imageUrls.isEmpty()) {
+                    Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
+                } else if (item.imageUrls.size == 1) {
+                    val url = item.imageUrls.first()
+                    Box(modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(12.dp))) {
                         AsyncImage(
                             model = url,
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).clip(RoundedCornerShape(12.dp)).clickable { previewUrl = url }
+                            modifier = Modifier.fillMaxSize().clickable { previewUrl = url }
                         )
+                        Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.End) {
+                            IconButton(onClick = { deleteCandidateUrl = url }) { Icon(Icons.Filled.Close, contentDescription = null) }
+                        }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
                 } else {
                     val listState = rememberLazyListState()
                     LazyRow(state = listState, modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(item.imageUrls) { url ->
-                            AsyncImage(
-                                model = url,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.width(240.dp).height(240.dp).clip(RoundedCornerShape(12.dp)).clickable { previewUrl = url }
-                            )
+                            Box(modifier = Modifier.width(240.dp).height(240.dp).clip(RoundedCornerShape(12.dp))) {
+                                AsyncImage(
+                                    model = url,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.matchParentSize().clickable { previewUrl = url }
+                                )
+                                Row(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp), horizontalArrangement = Arrangement.End) {
+                                    IconButton(onClick = { deleteCandidateUrl = url }) { Icon(Icons.Filled.Close, contentDescription = null) }
+                                }
+                            }
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
                 }
             }
             if (!editing) {
@@ -170,6 +211,62 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 Row(modifier = Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.End) {
                     IconButton(onClick = { previewUrl?.let { download(it, (item.name.ifBlank { "image" }) + ".jpg") } }) { Icon(Icons.Filled.Download, contentDescription = null) }
                     IconButton(onClick = { previewUrl = null }) { Icon(Icons.Filled.Close, contentDescription = null) }
+                }
+            }
+        }
+    }
+    if (showUploadDialog) {
+        Dialog(onDismissRequest = { if (!uploading) { showUploadDialog = false } }) {
+            Card(elevation = CardDefaults.cardElevation()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("正在上传图片")
+                    LinearProgressIndicator(progress = uploadProgress, modifier = Modifier.fillMaxWidth())
+                    Text(((uploadProgress * 100).toInt()).toString() + "%")
+                    if (uploadError != null) {
+                        Text(uploadError!!, color = MaterialTheme.colorScheme.error)
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(onClick = { showUploadDialog = false }) { Text("关闭") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (deleteCandidateUrl != null) {
+        Dialog(onDismissRequest = { if (!uploading) { deleteCandidateUrl = null } }) {
+            Card(elevation = CardDefaults.cardElevation()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("确认删除该图片？")
+                    var deleting by remember { mutableStateOf(false) }
+                    var deleteProgress by remember { mutableStateOf(0f) }
+                    var deleteError by remember { mutableStateOf<String?>(null) }
+                    if (!deleting) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(onClick = { deleteCandidateUrl = null }) { Text("取消") }
+                            Button(onClick = {
+                                deleting = true
+                                deleteError = null
+                                deleteProgress = 0f
+                                onDeleteImageWithProgress(deleteCandidateUrl!!, { p ->
+                                    deleteProgress = p.coerceIn(0f, 1f)
+                                }, { ok, err ->
+                                    deleting = false
+                                    if (ok) {
+                                        deleteCandidateUrl = null
+                                    } else {
+                                        deleteError = err ?: "删除失败"
+                                    }
+                                })
+                            }) { Text("确定") }
+                        }
+                    } else {
+                        LinearProgressIndicator(progress = deleteProgress, modifier = Modifier.fillMaxWidth())
+                        Text(((deleteProgress * 100).toInt()).toString() + "%")
+                        if (deleteError != null) {
+                            Text(deleteError!!, color = MaterialTheme.colorScheme.error)
+                            Button(onClick = { deleteCandidateUrl = null }) { Text("关闭") }
+                        }
+                    }
                 }
             }
         }

@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import android.net.Uri
+import com.glassous.fiagoods.data.OssApi
+import com.glassous.fiagoods.BuildConfig
 
 class GoodsViewModel : ViewModel() {
     private val api = SupabaseApi()
@@ -21,6 +24,8 @@ class GoodsViewModel : ViewModel() {
     val loading: StateFlow<Boolean> = _loading
     private val _authInvalidMessage = MutableStateFlow<String?>(null)
     val authInvalidMessage: StateFlow<String?> = _authInvalidMessage
+    private val _operationMessage = MutableStateFlow<String?>(null)
+    val operationMessage: StateFlow<String?> = _operationMessage
 
     fun refresh(context: Context) {
         viewModelScope.launch {
@@ -53,11 +58,18 @@ class GoodsViewModel : ViewModel() {
     fun addItem(context: Context, item: CargoItem, onDone: (Boolean) -> Unit) {
         viewModelScope.launch {
             if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
-            val created = withContext(Dispatchers.IO) { api.createCargoItem(item) }
-            if (created != null) {
-                _items.value = _items.value + created
-                onDone(true)
-            } else {
+            try {
+                val created = withContext(Dispatchers.IO) { api.createCargoItem(item) }
+                if (created != null) {
+                    _items.value = _items.value + created
+                    _operationMessage.value = "新增商品成功"
+                    onDone(true)
+                } else {
+                    _operationMessage.value = "新增商品失败"
+                    onDone(false)
+                }
+            } catch (e: Exception) {
+                _operationMessage.value = "新增商品异常"
                 onDone(false)
             }
         }
@@ -66,11 +78,18 @@ class GoodsViewModel : ViewModel() {
     fun updateItem(context: Context, id: String, patch: Map<String, Any?>, onDone: (Boolean) -> Unit) {
         viewModelScope.launch {
             if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
-            val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, patch) }
-            if (updated != null) {
-                _items.value = _items.value.map { if (it.id == id) updated else it }
-                onDone(true)
-            } else {
+            try {
+                val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, patch) }
+                if (updated != null) {
+                    _items.value = _items.value.map { if (it.id == id) updated else it }
+                    _operationMessage.value = "保存成功"
+                    onDone(true)
+                } else {
+                    _operationMessage.value = "保存失败"
+                    onDone(false)
+                }
+            } catch (e: Exception) {
+                _operationMessage.value = "保存异常"
                 onDone(false)
             }
         }
@@ -79,13 +98,161 @@ class GoodsViewModel : ViewModel() {
     fun deleteItem(context: Context, id: String, onDone: (Boolean) -> Unit) {
         viewModelScope.launch {
             if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
-            val ok = withContext(Dispatchers.IO) { api.deleteCargoItem(id) }
-            if (ok) {
-                _items.value = _items.value.filter { it.id != id }
-                onDone(true)
-            } else {
+            try {
+                val ok = withContext(Dispatchers.IO) { api.deleteCargoItem(id) }
+                if (ok) {
+                    _items.value = _items.value.filter { it.id != id }
+                    _operationMessage.value = "删除成功"
+                    onDone(true)
+                } else {
+                    _operationMessage.value = "删除失败"
+                    onDone(false)
+                }
+            } catch (e: Exception) {
+                _operationMessage.value = "删除异常"
                 onDone(false)
             }
         }
     }
+
+    fun addImage(context: Context, id: String, uri: Uri, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
+            val item = findById(id) ?: run { onDone(false); return@launch }
+            if (BuildConfig.OSS_ENDPOINT.isBlank() || BuildConfig.OSS_BUCKET.isBlank() || BuildConfig.OSS_ACCESS_KEY_ID.isBlank() || BuildConfig.OSS_ACCESS_KEY_SECRET.isBlank() || BuildConfig.OSS_PUBLIC_BASE_URL.isBlank()) {
+                _operationMessage.value = "OSS 配置缺失"
+                onDone(false)
+                return@launch
+            }
+            try {
+                val oss = OssApi(context)
+                val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                val ext = when (mime.lowercase()) {
+                    "image/png" -> "png"
+                    "image/webp" -> "webp"
+                    else -> "jpg"
+                }
+                val fileName = System.currentTimeMillis().toString() + "." + ext
+                val key = oss.buildKey("cargo/$id", fileName)
+                val url = withContext(Dispatchers.IO) { oss.uploadUri(key, uri) }
+                if (url != null) {
+                    val newList = item.imageUrls + url
+                    val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, mapOf("image_urls" to newList)) }
+                    if (updated != null) {
+                        _items.value = _items.value.map { if (it.id == id) updated else it }
+                        _operationMessage.value = "图片上传成功"
+                        onDone(true)
+                    } else {
+                        _operationMessage.value = "图片保存失败"
+                        onDone(false)
+                    }
+                } else {
+                    _operationMessage.value = "图片上传失败"
+                    onDone(false)
+                }
+            } catch (e: Exception) {
+                _operationMessage.value = "图片上传异常"
+                onDone(false)
+            }
+        }
+    }
+
+    fun addImageWithProgress(context: Context, id: String, uri: Uri, onProgress: (Long, Long) -> Unit, onDone: (Boolean, String?) -> Unit) {
+        if (!SessionPrefs.isVerified(context)) { onDone(false, "未验证") ; return }
+        val item = findById(id) ?: run { onDone(false, "商品不存在"); return }
+        if (BuildConfig.OSS_ENDPOINT.isBlank() || BuildConfig.OSS_BUCKET.isBlank() || BuildConfig.OSS_ACCESS_KEY_ID.isBlank() || BuildConfig.OSS_ACCESS_KEY_SECRET.isBlank() || BuildConfig.OSS_PUBLIC_BASE_URL.isBlank()) {
+            onDone(false, "OSS 配置缺失")
+            return
+        }
+        val oss = OssApi(context)
+        val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+        val ext = when (mime.lowercase()) {
+            "image/png" -> "png"
+            "image/webp" -> "webp"
+            else -> "jpg"
+        }
+        val fileName = System.currentTimeMillis().toString() + "." + ext
+        val key = oss.buildKey("cargo/$id", fileName)
+        oss.uploadUriAsync(key, uri, onProgress) { url, error ->
+            if (url != null) {
+                viewModelScope.launch {
+                    val newList = item.imageUrls + url
+                    val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, mapOf("image_urls" to newList)) }
+                    if (updated != null) {
+                        _items.value = _items.value.map { if (it.id == id) updated else it }
+                        onDone(true, null)
+                    } else {
+                        onDone(false, "图片保存失败")
+                    }
+                }
+            } else {
+                onDone(false, error ?: "上传失败")
+            }
+        }
+    }
+
+    fun replaceImage(context: Context, id: String, oldUrl: String, uri: Uri, onDone: (Boolean) -> Unit) {
+        // 移除修改图片功能
+    }
+
+    fun deleteImageWithProgress(context: Context, id: String, url: String, onProgress: (Float) -> Unit, onDone: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            if (!SessionPrefs.isVerified(context)) { onDone(false, "未验证"); return@launch }
+            val item = findById(id) ?: run { onDone(false, "商品不存在"); return@launch }
+            if (BuildConfig.OSS_ENDPOINT.isBlank() || BuildConfig.OSS_BUCKET.isBlank() || BuildConfig.OSS_ACCESS_KEY_ID.isBlank() || BuildConfig.OSS_ACCESS_KEY_SECRET.isBlank() || BuildConfig.OSS_PUBLIC_BASE_URL.isBlank()) {
+                onDone(false, "OSS 配置缺失")
+                return@launch
+            }
+            try {
+                val oss = OssApi(context)
+                onProgress(0.3f)
+                val okDel = withContext(Dispatchers.IO) { oss.deleteUrl(url) }
+                if (!okDel) { onDone(false, "删除 OSS 对象失败"); return@launch }
+                onProgress(0.6f)
+                val newList = item.imageUrls.filter { it != url }
+                val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, mapOf("image_urls" to newList)) }
+                if (updated != null) {
+                    _items.value = _items.value.map { if (it.id == id) updated else it }
+                    onProgress(1.0f)
+                    onDone(true, null)
+                } else {
+                    onDone(false, "更新数据库失败")
+                }
+            } catch (e: Exception) {
+                onDone(false, e.message ?: "删除异常")
+            }
+        }
+    }
+
+    fun deleteImage(context: Context, id: String, url: String, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
+            val item = findById(id) ?: run { onDone(false); return@launch }
+            if (BuildConfig.OSS_ENDPOINT.isBlank() || BuildConfig.OSS_BUCKET.isBlank() || BuildConfig.OSS_ACCESS_KEY_ID.isBlank() || BuildConfig.OSS_ACCESS_KEY_SECRET.isBlank() || BuildConfig.OSS_PUBLIC_BASE_URL.isBlank()) {
+                _operationMessage.value = "OSS 配置缺失"
+                onDone(false)
+                return@launch
+            }
+            try {
+                val oss = OssApi(context)
+                val okDel = withContext(Dispatchers.IO) { oss.deleteUrl(url) }
+                if (!okDel) { _operationMessage.value = "图片删除失败"; onDone(false); return@launch }
+                val newList = item.imageUrls.filter { it != url }
+                val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, mapOf("image_urls" to newList)) }
+                if (updated != null) {
+                    _items.value = _items.value.map { if (it.id == id) updated else it }
+                    _operationMessage.value = "图片删除成功"
+                    onDone(true)
+                } else {
+                    _operationMessage.value = "图片保存失败"
+                    onDone(false)
+                }
+            } catch (e: Exception) {
+                _operationMessage.value = "图片删除异常"
+                onDone(false)
+            }
+        }
+    }
+
+    fun clearOperationMessage() { _operationMessage.value = null }
 }

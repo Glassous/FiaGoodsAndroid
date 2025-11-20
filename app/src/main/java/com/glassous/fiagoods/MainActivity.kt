@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
                             val loading by vm.loading.collectAsState()
                             LaunchedEffect(Unit) { vm.refresh(this@MainActivity) }
                             val msg by vm.authInvalidMessage.collectAsState()
+                            val opMsg by vm.operationMessage.collectAsState()
                             LaunchedEffect(msg) {
                                 if (msg != null) {
                                     val encoded = Uri.encode(msg!!)
@@ -68,6 +69,12 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("auth?msg=$encoded") {
                                         popUpTo("home") { inclusive = true }
                                     }
+                                }
+                            }
+                            LaunchedEffect(opMsg) {
+                                if (opMsg != null) {
+                                    snackbarHostState.showSnackbar(opMsg!!)
+                                    vm.clearOperationMessage()
                                 }
                             }
                             HomeScreen(items = items, loading = loading, onItemClick = { id ->
@@ -86,7 +93,11 @@ class MainActivity : ComponentActivity() {
                                     item = item,
                                     onBack = { navController.popBackStack() },
                                     onSave = { id, patch -> vm.updateItem(this@MainActivity, id, patch) { } },
-                                    onDelete = { id, cb -> vm.deleteItem(this@MainActivity, id) { ok -> cb(ok) } }
+                                    onDelete = { id, cb -> vm.deleteItem(this@MainActivity, id) { ok -> cb(ok) } },
+                                    onAddImage = { uri -> vm.addImage(this@MainActivity, item.id, uri) { } },
+                                    onDeleteImage = { url -> vm.deleteImage(this@MainActivity, item.id, url) { } },
+                                    onAddImageWithProgress = { uri, onProgress, onDone -> vm.addImageWithProgress(this@MainActivity, item.id, uri, onProgress, onDone) },
+                                    onDeleteImageWithProgress = { url, onProgress, onDone -> vm.deleteImageWithProgress(this@MainActivity, item.id, url, onProgress, onDone) }
                                 )
                             }
                         }

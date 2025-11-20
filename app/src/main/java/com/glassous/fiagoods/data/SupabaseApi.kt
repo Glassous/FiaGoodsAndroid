@@ -73,61 +73,73 @@ class SupabaseApi {
 
     fun createCargoItem(item: CargoItem): CargoItem? {
         if (baseRest.isBlank() || apiKey.isBlank()) return null
-        val url = "$baseRest/cargo_items"
-        val json = gson.toJson(item)
-        val body: RequestBody = json.toRequestBody("application/json".toMediaType())
-        val req = Request.Builder()
-            .url(url)
-            .addHeader("apikey", apiKey)
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Accept", "application/json")
-            .addHeader("Prefer", "return=representation")
-            .post(body)
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) return null
-            val resBody = resp.body?.string() ?: return null
-            val type = object : TypeToken<List<CargoItem>>() {}.type
-            val list = gson.fromJson<List<CargoItem>>(resBody, type) ?: emptyList()
-            return list.firstOrNull()
+        return try {
+            val url = "$baseRest/cargo_items"
+            val json = gson.toJson(item)
+            val body: RequestBody = json.toRequestBody("application/json".toMediaType())
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("apikey", apiKey)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Accept", "application/json")
+                .addHeader("Prefer", "return=representation")
+                .post(body)
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val resBody = resp.body?.string() ?: return null
+                val type = object : TypeToken<List<CargoItem>>() {}.type
+                val list = gson.fromJson<List<CargoItem>>(resBody, type) ?: emptyList()
+                list.firstOrNull()
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 
     fun updateCargoItem(id: String, patch: Map<String, Any?>): CargoItem? {
         if (baseRest.isBlank() || apiKey.isBlank()) return null
-        val url = "$baseRest/cargo_items?id=eq.$id"
-        val json = gson.toJson(patch)
-        val body: RequestBody = json.toRequestBody("application/json".toMediaType())
-        val req = Request.Builder()
-            .url(url)
-            .addHeader("apikey", apiKey)
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Accept", "application/json")
-            .addHeader("Prefer", "return=representation")
-            .method("PATCH", body)
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) return null
-            val resBody = resp.body?.string() ?: return null
-            val type = object : TypeToken<List<CargoItem>>() {}.type
-            val list = gson.fromJson<List<CargoItem>>(resBody, type) ?: emptyList()
-            return list.firstOrNull()
+        return try {
+            val url = "$baseRest/cargo_items?id=eq.$id"
+            val json = gson.toJson(patch)
+            val body: RequestBody = json.toRequestBody("application/json".toMediaType())
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("apikey", apiKey)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Accept", "application/json")
+                .addHeader("Prefer", "return=representation")
+                .method("PATCH", body)
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val resBody = resp.body?.string() ?: return null
+                val type = object : TypeToken<List<CargoItem>>() {}.type
+                val list = gson.fromJson<List<CargoItem>>(resBody, type) ?: emptyList()
+                list.firstOrNull()
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 
     fun deleteCargoItem(id: String): Boolean {
         if (baseRest.isBlank() || apiKey.isBlank()) return false
-        val url = "$baseRest/cargo_items?id=eq.$id"
-        val req = Request.Builder()
-            .url(url)
-            .addHeader("apikey", apiKey)
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Accept", "application/json")
-            .addHeader("Prefer", "return=minimal")
-            .delete()
-            .build()
-        client.newCall(req).execute().use { resp ->
-            return resp.isSuccessful
+        return try {
+            val url = "$baseRest/cargo_items?id=eq.$id"
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("apikey", apiKey)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Accept", "application/json")
+                .addHeader("Prefer", "return=minimal")
+                .delete()
+                .build()
+            client.newCall(req).execute().use { resp ->
+                resp.isSuccessful
+            }
+        } catch (e: Exception) {
+            false
         }
     }
 }
