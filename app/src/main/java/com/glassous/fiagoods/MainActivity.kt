@@ -87,7 +87,8 @@ class MainActivity : ComponentActivity() {
                             route = "detail/{id}"
                         ) { backStackEntry ->
                             val id = backStackEntry.arguments?.getString("id") ?: ""
-                            val item = vm.findById(id)
+                        val items by vm.items.collectAsState()
+                        val item = items.firstOrNull { it.id == id }
                             if (item != null) {
                                 DetailScreen(
                                     item = item,
