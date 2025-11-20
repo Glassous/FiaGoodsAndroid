@@ -91,10 +91,17 @@ class MainActivity : ComponentActivity() {
                                     vm.clearOperationMessage()
                                 }
                             }
+                            val favorites by vm.favorites.collectAsState()
                             HomeScreen(items = items, loading = loading, onItemClick = { id ->
                                 navController.navigate("detail/$id")
-                            }, onAddItem = { item ->
-                                vm.addItem(this@MainActivity, item) { }
+                            }, favorites = favorites, onToggleFavorite = { id ->
+                                vm.toggleFavorite(this@MainActivity, id) { }
+                            }, onAddItemWithImage = { item, uri ->
+                                vm.addItem(this@MainActivity, item) { ok ->
+                                    if (ok && uri != null) {
+                                        vm.addImage(this@MainActivity, item.id, uri) { }
+                                    }
+                                }
                             })
                         }
                         composable(

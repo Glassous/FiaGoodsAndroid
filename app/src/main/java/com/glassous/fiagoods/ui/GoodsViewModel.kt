@@ -26,6 +26,8 @@ class GoodsViewModel : ViewModel() {
     val authInvalidMessage: StateFlow<String?> = _authInvalidMessage
     private val _operationMessage = MutableStateFlow<String?>(null)
     val operationMessage: StateFlow<String?> = _operationMessage
+    private val _favorites = MutableStateFlow<Set<String>>(emptySet())
+    val favorites: StateFlow<Set<String>> = _favorites
 
     fun refresh(context: Context) {
         viewModelScope.launch {
@@ -47,6 +49,7 @@ class GoodsViewModel : ViewModel() {
             }
             val res = withContext(Dispatchers.IO) { api.fetchCargoItems() }
             _items.value = res
+            _favorites.value = res.filter { it.isFavorite }.map { it.id }.toSet()
             _loading.value = false
         }
     }
@@ -255,4 +258,25 @@ class GoodsViewModel : ViewModel() {
     }
 
     fun clearOperationMessage() { _operationMessage.value = null }
+
+    fun toggleFavorite(context: Context, id: String, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
+            val isFav = _favorites.value.contains(id)
+            try {
+                val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, mapOf("is_favorite" to (!isFav))) }
+                if (updated != null) {
+                    _items.value = _items.value.map { if (it.id == id) updated else it }
+                    _favorites.value = _items.value.filter { it.isFavorite }.map { it.id }.toSet()
+                    onDone(true)
+                } else {
+                    _operationMessage.value = if (isFav) "取消收藏失败" else "收藏失败"
+                    onDone(false)
+                }
+            } catch (e: Exception) {
+                _operationMessage.value = if (isFav) "取消收藏异常" else "收藏异常"
+                onDone(false)
+            }
+        }
+    }
 }

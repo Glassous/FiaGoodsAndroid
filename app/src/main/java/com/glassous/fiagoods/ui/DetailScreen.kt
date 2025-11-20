@@ -268,7 +268,6 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 item { FieldCard(label = "售价", value = "¥" + String.format("%.2f", item.price)) }
                 item { FieldCard(label = "分组", value = item.groupName) }
                 item { FieldCard(label = "链接", value = item.link) }
-                item { FieldCard(label = "描述", value = item.description) }
             } else {
                 item { OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
                 item { OutlinedTextField(value = groupName, onValueChange = { groupName = it }, label = { Text("分组") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }

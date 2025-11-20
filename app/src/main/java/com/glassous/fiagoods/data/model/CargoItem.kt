@@ -9,5 +9,6 @@ data class CargoItem(
     @SerializedName("group_name") val groupName: String,
     val category: String,
     val price: Double,
-    val link: String
+    val link: String,
+    @SerializedName("is_favorite") val isFavorite: Boolean = false
 )

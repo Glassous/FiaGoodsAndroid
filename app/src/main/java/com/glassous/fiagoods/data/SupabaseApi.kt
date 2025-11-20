@@ -142,4 +142,64 @@ class SupabaseApi {
             false
         }
     }
+
+    fun fetchFavoriteItemIds(): List<String> {
+        if (baseRest.isBlank() || apiKey.isBlank()) return emptyList()
+        val url = "$baseRest/favorite_items?select=item_id"
+        val req = Request.Builder()
+            .url(url)
+            .addHeader("apikey", apiKey)
+            .addHeader("Authorization", "Bearer $apiKey")
+            .addHeader("Accept", "application/json")
+            .build()
+        client.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) return emptyList()
+            val body = resp.body?.string() ?: return emptyList()
+            val type = object : TypeToken<List<Map<String, String>>>() {}.type
+            val list = gson.fromJson<List<Map<String, String>>>(body, type) ?: emptyList()
+            return list.mapNotNull { it["item_id"] }
+        }
+    }
+
+    fun addFavorite(itemId: String): Boolean {
+        if (baseRest.isBlank() || apiKey.isBlank()) return false
+        return try {
+            val url = "$baseRest/favorite_items"
+            val json = gson.toJson(mapOf("item_id" to itemId))
+            val body: RequestBody = json.toRequestBody("application/json".toMediaType())
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("apikey", apiKey)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Accept", "application/json")
+                .addHeader("Prefer", "return=minimal")
+                .post(body)
+                .build()
+            client.newCall(req).execute().use { resp ->
+                resp.isSuccessful
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun removeFavorite(itemId: String): Boolean {
+        if (baseRest.isBlank() || apiKey.isBlank()) return false
+        return try {
+            val url = "$baseRest/favorite_items?item_id=eq.$itemId"
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("apikey", apiKey)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Accept", "application/json")
+                .addHeader("Prefer", "return=minimal")
+                .delete()
+                .build()
+            client.newCall(req).execute().use { resp ->
+                resp.isSuccessful
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
 }
