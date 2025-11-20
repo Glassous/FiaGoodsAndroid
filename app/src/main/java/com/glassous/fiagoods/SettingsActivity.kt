@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -34,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -95,9 +98,18 @@ private fun SettingsScreen(mode: String, density: Int, onBack: () -> Unit, onMod
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("主题模式", style = MaterialTheme.typography.titleMedium)
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = { onModeChange("system") }, enabled = mode != "system", modifier = Modifier.weight(1f)) { Text("跟随系统") }
-                            Button(onClick = { onModeChange("light") }, enabled = mode != "light", modifier = Modifier.weight(1f)) { Text("浅色") }
-                            Button(onClick = { onModeChange("dark") }, enabled = mode != "dark", modifier = Modifier.weight(1f)) { Text("深色") }
+                            Button(onClick = { onModeChange("system") }, modifier = Modifier.weight(1f)) {
+                                if (mode == "system") { Icon(Icons.Filled.Check, contentDescription = null); Spacer(Modifier.width(6.dp)) }
+                                Text("系统")
+                            }
+                            Button(onClick = { onModeChange("light") }, modifier = Modifier.weight(1f)) {
+                                if (mode == "light") { Icon(Icons.Filled.Check, contentDescription = null); Spacer(Modifier.width(6.dp)) }
+                                Text("浅色")
+                            }
+                            Button(onClick = { onModeChange("dark") }, modifier = Modifier.weight(1f)) {
+                                if (mode == "dark") { Icon(Icons.Filled.Check, contentDescription = null); Spacer(Modifier.width(6.dp)) }
+                                Text("深色")
+                            }
                         }
                     }
                 }
