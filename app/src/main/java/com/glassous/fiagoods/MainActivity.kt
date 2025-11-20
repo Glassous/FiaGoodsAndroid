@@ -80,7 +80,7 @@ class MainActivity : ComponentActivity() {
                             val id = backStackEntry.arguments?.getString("id") ?: ""
                             val item = vm.findById(id)
                             if (item != null) {
-                                DetailScreen(item)
+                                DetailScreen(item = item, onBack = { navController.popBackStack() })
                             }
                         }
                     }
