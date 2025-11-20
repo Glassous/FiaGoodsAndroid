@@ -4,13 +4,10 @@ import com.google.gson.annotations.SerializedName
 
 data class CargoItem(
     val id: String,
-    val name: String,
-    val category: String,
-    val stock: Int?,
-    val price: Double?,
-    val sold: Int,
-    val brief: String,
     val description: String,
-    val specs: String,
-    @SerializedName("image_urls") val imageUrls: List<String> = emptyList()
+    @SerializedName("image_urls") val imageUrls: List<String> = emptyList(),
+    @SerializedName("group_name") val groupName: String,
+    val category: String,
+    val price: Double,
+    val link: String
 )

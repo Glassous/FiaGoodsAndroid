@@ -42,15 +42,25 @@ android {
         buildConfigField("String", "OSS_ACCESS_KEY_ID", "\"$OSS_ACCESS_KEY_ID\"")
         buildConfigField("String", "OSS_ACCESS_KEY_SECRET", "\"$OSS_ACCESS_KEY_SECRET\"")
         buildConfigField("String", "OSS_PUBLIC_BASE_URL", "\"$OSS_PUBLIC_BASE_URL\"")
+
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            isDebuggable = false
         }
     }
     compileOptions {
@@ -63,6 +73,17 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/AL2.0",
+                "META-INF/LGPL2.1"
+            )
+        }
     }
 }
 

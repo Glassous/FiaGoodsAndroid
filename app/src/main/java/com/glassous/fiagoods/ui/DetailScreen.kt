@@ -53,7 +53,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Checkbox
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.Dispatchers
@@ -77,15 +76,11 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
     val ctx = LocalContext.current
     var editing by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var name by remember { mutableStateOf(item.name) }
-    var category by remember { mutableStateOf(item.category) }
-    var priceText by remember { mutableStateOf(item.price?.let { String.format("%.2f", it) } ?: "") }
-    var soldText by remember { mutableStateOf(item.sold.toString()) }
-    var unlimited by remember { mutableStateOf(item.stock == null) }
-    var stockText by remember { mutableStateOf(item.stock?.toString() ?: "") }
-    var brief by remember { mutableStateOf(item.brief) }
     var description by remember { mutableStateOf(item.description) }
-    var specs by remember { mutableStateOf(item.specs) }
+    var category by remember { mutableStateOf(item.category) }
+    var groupName by remember { mutableStateOf(item.groupName) }
+    var link by remember { mutableStateOf(item.link) }
+    var priceText by remember { mutableStateOf(String.format("%.2f", item.price)) }
     var deleteCandidateUrl by remember { mutableStateOf<String?>(null) }
     var showUploadDialog by remember { mutableStateOf(false) }
     var uploading by remember { mutableStateOf(false) }
@@ -144,17 +139,14 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     IconButton(onClick = { editing = true }) { Icon(Icons.Filled.Edit, contentDescription = null) }
                 } else {
                     IconButton(onClick = { editing = false }) { Icon(Icons.Filled.Close, contentDescription = null) }
-                    val canSave = name.isNotBlank() && category.isNotBlank() && (unlimited || stockText.toIntOrNull() != null) && (priceText.isBlank() || priceText.toDoubleOrNull() != null) && soldText.toIntOrNull() != null
+                    val canSave = description.isNotBlank() && category.isNotBlank() && priceText.toDoubleOrNull() != null
                     IconButton(onClick = {
                         val patch = mutableMapOf<String, Any?>()
-                        patch["name"] = name
-                        patch["category"] = category
-                        patch["price"] = priceText.takeIf { it.isNotBlank() }?.toDoubleOrNull()
-                        patch["sold"] = soldText.toIntOrNull() ?: item.sold
-                        patch["stock"] = if (unlimited) null else stockText.toIntOrNull()
-                        patch["brief"] = brief
                         patch["description"] = description
-                        patch["specs"] = specs
+                        patch["category"] = category
+                        patch["group_name"] = groupName
+                        patch["link"] = link
+                        patch["price"] = priceText.toDoubleOrNull()
                         onSave(item.id, patch)
                         editing = false
                     }, enabled = canSave) { Icon(Icons.Filled.Save, contentDescription = null) }
@@ -164,9 +156,9 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
         LazyColumn(modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 16.dp + bottom)) {
             item {
                 if (!editing) {
-                    Text(item.name, style = MaterialTheme.typography.displaySmall)
+                    Text(item.description, style = MaterialTheme.typography.displaySmall)
                 } else {
-                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("名称") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp))
+                    OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp))
                 }
             }
             item {
@@ -200,7 +192,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                                 val total = item.imageUrls.size.coerceAtLeast(1)
                                 var done = 0
                                 for ((idx, u) in item.imageUrls.withIndex()) {
-                                    val name = (item.name.ifBlank { "image" }) + "_" + (idx + 1) + ".jpg"
+                                    val name = (item.description.ifBlank { "image" }) + "_" + (idx + 1) + ".jpg"
                                     val ok = withContext(Dispatchers.IO) { saveToGallery(u, name) }
                                     done++
                                     saveProgress = done.toFloat() / total.toFloat()
@@ -253,7 +245,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                                 val total = item.imageUrls.size.coerceAtLeast(1)
                                 var done = 0
                                 for ((idx, u) in item.imageUrls.withIndex()) {
-                                    val name = (item.name.ifBlank { "image" }) + "_" + (idx + 1) + ".jpg"
+                                    val name = (item.description.ifBlank { "image" }) + "_" + (idx + 1) + ".jpg"
                                     val ok = withContext(Dispatchers.IO) { saveToGallery(u, name) }
                                     done++
                                     saveProgress = done.toFloat() / total.toFloat()
@@ -273,28 +265,16 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
             }
             if (!editing) {
                 item { FieldCard(label = "类别", value = item.category) }
-                item { FieldCard(label = "售价", value = item.price?.let { "¥" + String.format("%.2f", it) } ?: "¥0.00") }
-                item { FieldCard(label = "销量", value = item.sold.toString()) }
-                item { FieldCard(label = "库存", value = if (item.stock == null) "无限" else item.stock.toString()) }
-                item { FieldCard(label = "简介", value = item.brief) }
+                item { FieldCard(label = "售价", value = "¥" + String.format("%.2f", item.price)) }
+                item { FieldCard(label = "分组", value = item.groupName) }
+                item { FieldCard(label = "链接", value = item.link) }
                 item { FieldCard(label = "描述", value = item.description) }
-                item { FieldCard(label = "规格", value = item.specs) }
             } else {
                 item { OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
+                item { OutlinedTextField(value = groupName, onValueChange = { groupName = it }, label = { Text("分组") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
+                item { OutlinedTextField(value = link, onValueChange = { link = it }, label = { Text("链接") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
                 item { OutlinedTextField(value = priceText, onValueChange = { priceText = it }, label = { Text("售价") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
-                item { OutlinedTextField(value = soldText, onValueChange = { soldText = it }, label = { Text("销量") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = unlimited, onCheckedChange = { unlimited = it })
-                        Text("无限库存")
-                    }
-                }
-                if (!unlimited) {
-                    item { OutlinedTextField(value = stockText, onValueChange = { stockText = it }, label = { Text("库存") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
-                }
-                item { OutlinedTextField(value = brief, onValueChange = { brief = it }, label = { Text("简介") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
                 item { OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
-                item { OutlinedTextField(value = specs, onValueChange = { specs = it }, label = { Text("规格") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
             }
             if (editing) {
                 item {
@@ -309,7 +289,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
         }, actions = {
             androidx.compose.material3.TextButton(onClick = { previewUrl = null }) { Text("取消") }
             androidx.compose.material3.TextButton(onClick = {
-                val fname = (item.name.ifBlank { "image" }) + ".jpg"
+                val fname = (item.description.ifBlank { "image" }) + ".jpg"
                 showSaveDialog = true
                 saving = true
                 saveProgress = 0f
