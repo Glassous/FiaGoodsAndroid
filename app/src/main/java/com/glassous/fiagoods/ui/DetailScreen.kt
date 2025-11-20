@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,14 +44,28 @@ import android.net.Uri
 import android.os.Environment
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Checkbox
 import coil.compose.AsyncImage
 import com.glassous.fiagoods.data.model.CargoItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailScreen(item: CargoItem, onBack: () -> Unit) {
+fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<String, Any?>) -> Unit, onDelete: (String, (Boolean) -> Unit) -> Unit) {
     var previewUrl by remember { mutableStateOf<String?>(null) }
     val ctx = LocalContext.current
+    var editing by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf(item.name) }
+    var category by remember { mutableStateOf(item.category) }
+    var priceText by remember { mutableStateOf(item.price?.let { String.format("%.2f", it) } ?: "") }
+    var soldText by remember { mutableStateOf(item.sold.toString()) }
+    var unlimited by remember { mutableStateOf(item.stock == null) }
+    var stockText by remember { mutableStateOf(item.stock?.toString() ?: "") }
+    var brief by remember { mutableStateOf(item.brief) }
+    var description by remember { mutableStateOf(item.description) }
+    var specs by remember { mutableStateOf(item.specs) }
     fun download(url: String, fileName: String) {
         val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val request = DownloadManager.Request(Uri.parse(url))
@@ -63,18 +79,35 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit) {
             title = { Text("详情") },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) } },
             actions = {
-                if (item.imageUrls.isNotEmpty()) {
+                if (!editing) {
+                    IconButton(onClick = { editing = true }) { Icon(Icons.Filled.Edit, contentDescription = null) }
+                } else {
+                    IconButton(onClick = { editing = false }) { Icon(Icons.Filled.Close, contentDescription = null) }
+                    val canSave = name.isNotBlank() && category.isNotBlank() && (unlimited || stockText.toIntOrNull() != null) && (priceText.isBlank() || priceText.toDoubleOrNull() != null) && soldText.toIntOrNull() != null
                     IconButton(onClick = {
-                        item.imageUrls.forEachIndexed { idx, url ->
-                            val name = (item.name.ifBlank { "image" }) + "_" + (idx + 1) + ".jpg"
-                            download(url, name)
-                        }
-                    }) { Icon(Icons.Filled.Download, contentDescription = null) }
+                        val patch = mutableMapOf<String, Any?>()
+                        patch["name"] = name
+                        patch["category"] = category
+                        patch["price"] = priceText.takeIf { it.isNotBlank() }?.toDoubleOrNull()
+                        patch["sold"] = soldText.toIntOrNull() ?: item.sold
+                        patch["stock"] = if (unlimited) null else stockText.toIntOrNull()
+                        patch["brief"] = brief
+                        patch["description"] = description
+                        patch["specs"] = specs
+                        onSave(item.id, patch)
+                        editing = false
+                    }, enabled = canSave) { Icon(Icons.Filled.Save, contentDescription = null) }
                 }
             }
         )
         LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item { Text(item.name, style = MaterialTheme.typography.headlineSmall) }
+            item {
+                if (!editing) {
+                    Text(item.name, style = MaterialTheme.typography.headlineSmall)
+                } else {
+                    OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("名称") }, singleLine = true)
+                }
+            }
             item {
                 if (item.imageUrls.size <= 1) {
                     val url = item.imageUrls.firstOrNull()
@@ -100,13 +133,34 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit) {
                     }
                 }
             }
-            item { FieldCard(label = "类别", value = item.category) }
-            item { FieldCard(label = "售价", value = item.price?.let { "¥" + String.format("%.2f", it) } ?: "¥0.00") }
-            item { FieldCard(label = "销量", value = item.sold.toString()) }
-            item { FieldCard(label = "库存", value = (item.stock ?: 0).toString()) }
-            item { FieldCard(label = "简介", value = item.brief) }
-            item { FieldCard(label = "描述", value = item.description) }
-            item { FieldCard(label = "规格", value = item.specs) }
+            if (!editing) {
+                item { FieldCard(label = "类别", value = item.category) }
+                item { FieldCard(label = "售价", value = item.price?.let { "¥" + String.format("%.2f", it) } ?: "¥0.00") }
+                item { FieldCard(label = "销量", value = item.sold.toString()) }
+                item { FieldCard(label = "库存", value = if (item.stock == null) "无限" else item.stock.toString()) }
+                item { FieldCard(label = "简介", value = item.brief) }
+                item { FieldCard(label = "描述", value = item.description) }
+                item { FieldCard(label = "规格", value = item.specs) }
+            } else {
+                item { OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true) }
+                item { OutlinedTextField(value = priceText, onValueChange = { priceText = it }, label = { Text("售价") }, singleLine = true) }
+                item { OutlinedTextField(value = soldText, onValueChange = { soldText = it }, label = { Text("销量") }, singleLine = true) }
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = unlimited, onCheckedChange = { unlimited = it })
+                        Text("无限库存")
+                    }
+                }
+                if (!unlimited) {
+                    item { OutlinedTextField(value = stockText, onValueChange = { stockText = it }, label = { Text("库存") }, singleLine = true) }
+                }
+                item { OutlinedTextField(value = brief, onValueChange = { brief = it }, label = { Text("简介") }) }
+                item { OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") }) }
+                item { OutlinedTextField(value = specs, onValueChange = { specs = it }, label = { Text("规格") }) }
+            }
+            item {
+                Button(onClick = { showDeleteConfirm = true }) { Text("删除商品") }
+            }
         }
     }
     if (previewUrl != null) {
@@ -116,6 +170,24 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit) {
                 Row(modifier = Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.End) {
                     IconButton(onClick = { previewUrl?.let { download(it, (item.name.ifBlank { "image" }) + ".jpg") } }) { Icon(Icons.Filled.Download, contentDescription = null) }
                     IconButton(onClick = { previewUrl = null }) { Icon(Icons.Filled.Close, contentDescription = null) }
+                }
+            }
+        }
+    }
+    if (showDeleteConfirm) {
+        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
+            Card(elevation = CardDefaults.cardElevation()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("确认删除该商品？")
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(onClick = { showDeleteConfirm = false }) { Text("取消") }
+                        Button(onClick = {
+                            onDelete(item.id) { ok ->
+                                showDeleteConfirm = false
+                                if (ok) onBack()
+                            }
+                        }) { Text("确定") }
+                    }
                 }
             }
         }

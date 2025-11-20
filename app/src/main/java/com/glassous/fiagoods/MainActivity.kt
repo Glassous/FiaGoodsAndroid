@@ -70,9 +70,11 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                            HomeScreen(items = items, loading = loading) { id ->
+                            HomeScreen(items = items, loading = loading, onItemClick = { id ->
                                 navController.navigate("detail/$id")
-                            }
+                            }, onAddItem = { item ->
+                                vm.addItem(this@MainActivity, item) { }
+                            })
                         }
                         composable(
                             route = "detail/{id}"
@@ -80,7 +82,12 @@ class MainActivity : ComponentActivity() {
                             val id = backStackEntry.arguments?.getString("id") ?: ""
                             val item = vm.findById(id)
                             if (item != null) {
-                                DetailScreen(item = item, onBack = { navController.popBackStack() })
+                                DetailScreen(
+                                    item = item,
+                                    onBack = { navController.popBackStack() },
+                                    onSave = { id, patch -> vm.updateItem(this@MainActivity, id, patch) { } },
+                                    onDelete = { id, cb -> vm.deleteItem(this@MainActivity, id) { ok -> cb(ok) } }
+                                )
                             }
                         }
                     }

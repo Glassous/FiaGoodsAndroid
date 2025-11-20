@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 class GoodsViewModel : ViewModel() {
     private val api = SupabaseApi()
@@ -48,4 +49,43 @@ class GoodsViewModel : ViewModel() {
     fun findById(id: String): CargoItem? = _items.value.firstOrNull { it.id == id }
 
     fun clearAuthMessage() { _authInvalidMessage.value = null }
+
+    fun addItem(context: Context, item: CargoItem, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
+            val created = withContext(Dispatchers.IO) { api.createCargoItem(item) }
+            if (created != null) {
+                _items.value = _items.value + created
+                onDone(true)
+            } else {
+                onDone(false)
+            }
+        }
+    }
+
+    fun updateItem(context: Context, id: String, patch: Map<String, Any?>, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
+            val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, patch) }
+            if (updated != null) {
+                _items.value = _items.value.map { if (it.id == id) updated else it }
+                onDone(true)
+            } else {
+                onDone(false)
+            }
+        }
+    }
+
+    fun deleteItem(context: Context, id: String, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
+            val ok = withContext(Dispatchers.IO) { api.deleteCargoItem(id) }
+            if (ok) {
+                _items.value = _items.value.filter { it.id != id }
+                onDone(true)
+            } else {
+                onDone(false)
+            }
+        }
+    }
 }
