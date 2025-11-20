@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.draw.blur
 import android.app.DownloadManager
 import android.content.Context
 import android.content.ContentValues
@@ -133,7 +134,8 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
         return true
     }
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    Column(modifier = Modifier.fillMaxSize()) {
+    val hasDialog = previewUrl != null || showUploadDialog || deleteCandidateUrl != null || showSaveDialog || showDeleteConfirm
+    Column(modifier = if (hasDialog) Modifier.fillMaxSize().blur(12.dp) else Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("详情") },
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) } },

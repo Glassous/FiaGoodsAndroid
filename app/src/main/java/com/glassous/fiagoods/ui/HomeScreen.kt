@@ -46,6 +46,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.draw.blur
 import java.util.UUID
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
@@ -62,10 +63,10 @@ fun HomeScreen(
     onAddItem: (CargoItem) -> Unit
 ) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    Column(modifier = Modifier.fillMaxSize()) {
-        var query by remember { mutableStateOf("") }
-        var searchOpen by remember { mutableStateOf(false) }
-        var addOpen by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var searchOpen by remember { mutableStateOf(false) }
+    var addOpen by remember { mutableStateOf(false) }
+    Column(modifier = if (addOpen) Modifier.fillMaxSize().blur(12.dp) else Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("FiaGoods") },
             actions = {
