@@ -156,7 +156,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
         LazyColumn(modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
                 if (!editing) {
-                    Text(item.name, style = MaterialTheme.typography.headlineSmall)
+                    Text(item.name, style = MaterialTheme.typography.headlineMedium)
                 } else {
                     OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("名称") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp))
                 }
@@ -166,7 +166,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     if (editing) Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
                 } else if (item.imageUrls.size == 1) {
                     val url = item.imageUrls.first()
-                    Box(modifier = Modifier.fillMaxWidth().height(240.dp).clip(RoundedCornerShape(12.dp))) {
+                    Box(modifier = Modifier.fillMaxWidth().height(480.dp).clip(RoundedCornerShape(12.dp))) {
                         AsyncImage(
                             model = url,
                             contentDescription = null,
@@ -210,9 +210,9 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     }
                 } else {
                     val listState = rememberLazyListState()
-                    LazyRow(state = listState, modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyRow(state = listState, modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(item.imageUrls) { url ->
-                            Box(modifier = Modifier.width(240.dp).height(240.dp).clip(RoundedCornerShape(12.dp))) {
+                            Box(modifier = Modifier.width(400.dp).height(400.dp).clip(RoundedCornerShape(12.dp))) {
                                 AsyncImage(
                                     model = url,
                                     contentDescription = null,
@@ -292,7 +292,10 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
     }
     if (previewUrl != null) {
         Dialog(onDismissRequest = { previewUrl = null }) {
-            Box(modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().heightIn(max = 680.dp)) {
+                Card(elevation = CardDefaults.cardElevation()) {
+                    AsyncImage(model = previewUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)))
+                }
                 Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     IconButton(onClick = {
                         val fname = (item.name.ifBlank { "image" }) + ".jpg"
@@ -308,9 +311,6 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                         }
                     }) { Icon(Icons.Filled.Download, contentDescription = null) }
                     IconButton(onClick = { previewUrl = null }) { Icon(Icons.Filled.Close, contentDescription = null) }
-                }
-                Card(elevation = CardDefaults.cardElevation()) {
-                    AsyncImage(model = previewUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)))
                 }
             }
         }

@@ -74,15 +74,12 @@ fun HomeScreen(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         placeholder = { Text("搜索") },
-                        shape = RoundedCornerShape(12.dp),
-                        trailingIcon = {
-                            IconButton(onClick = { query = ""; searchOpen = false }) { Icon(Icons.Filled.Close, contentDescription = null) }
-                        },
+                        shape = RoundedCornerShape(20.dp),
                         modifier = Modifier.widthIn(min = 120.dp, max = 240.dp)
                     )
                 }
                 IconButton(onClick = { searchOpen = !searchOpen }) {
-                    Icon(Icons.Filled.Search, contentDescription = null)
+                    Icon(imageVector = if (searchOpen) Icons.Filled.Close else Icons.Filled.Search, contentDescription = null)
                 }
                 IconButton(onClick = { addOpen = true }) {
                     Icon(Icons.Filled.Add, contentDescription = null)
