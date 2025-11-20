@@ -51,6 +51,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.PaddingValues
+import com.glassous.fiagoods.ui.components.AppDialog
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -136,61 +137,54 @@ fun HomeScreen(
         }
 
         if (addOpen) {
-            Dialog(onDismissRequest = { addOpen = false }) {
-                Card(elevation = CardDefaults.cardElevation()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        var name by remember { mutableStateOf("") }
-                        var category by remember { mutableStateOf("") }
-                        var priceText by remember { mutableStateOf("") }
-                        var soldText by remember { mutableStateOf("0") }
-                        var unlimited by remember { mutableStateOf(true) }
-                        var stockText by remember { mutableStateOf("") }
-                        var brief by remember { mutableStateOf("") }
-                        var description by remember { mutableStateOf("") }
-                        var specs by remember { mutableStateOf("") }
-
-                        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("名称") }, singleLine = true)
-                        OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true)
-                        OutlinedTextField(value = priceText, onValueChange = { priceText = it }, label = { Text("售价") }, singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next))
-                        OutlinedTextField(value = soldText, onValueChange = { soldText = it }, label = { Text("销量") }, singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = unlimited, onCheckedChange = { unlimited = it })
-                            Text("无限库存")
-                        }
-                        if (!unlimited) {
-                            OutlinedTextField(value = stockText, onValueChange = { stockText = it }, label = { Text("库存") }, singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done))
-                        }
-                        OutlinedTextField(value = brief, onValueChange = { brief = it }, label = { Text("简介") })
-                        OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") })
-                        OutlinedTextField(value = specs, onValueChange = { specs = it }, label = { Text("规格") })
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = { addOpen = false }) { Text("取消") }
-                            val canSave = name.isNotBlank() && category.isNotBlank() && (unlimited || stockText.isNotBlank()) && soldText.toIntOrNull() != null && (priceText.isBlank() || priceText.toDoubleOrNull() != null)
-                            Button(onClick = {
-                                val id = UUID.randomUUID().toString()
-                                val stockVal = if (unlimited) null else stockText.toIntOrNull()
-                                val priceVal = priceText.takeIf { it.isNotBlank() }?.toDoubleOrNull()
-                                val soldVal = soldText.toIntOrNull() ?: 0
-                                val item = CargoItem(
-                                    id = id,
-                                    name = name,
-                                    category = category,
-                                    stock = stockVal,
-                                    price = priceVal,
-                                    sold = soldVal,
-                                    brief = brief,
-                                    description = description,
-                                    specs = specs,
-                                    imageUrls = emptyList()
-                                )
-                                onAddItem(item)
-                                addOpen = false
-                            }, enabled = canSave) { Text("保存") }
-                        }
-                    }
+            var name by remember { mutableStateOf("") }
+            var category by remember { mutableStateOf("") }
+            var priceText by remember { mutableStateOf("") }
+            var soldText by remember { mutableStateOf("0") }
+            var unlimited by remember { mutableStateOf(true) }
+            var stockText by remember { mutableStateOf("") }
+            var brief by remember { mutableStateOf("") }
+            var description by remember { mutableStateOf("") }
+            var specs by remember { mutableStateOf("") }
+            val canSave = name.isNotBlank() && category.isNotBlank() && (unlimited || stockText.isNotBlank()) && soldText.toIntOrNull() != null && (priceText.isBlank() || priceText.toDoubleOrNull() != null)
+            AppDialog(onDismiss = { addOpen = false }, title = "新增商品", content = {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("名称") }, singleLine = true)
+                OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true)
+                OutlinedTextField(value = priceText, onValueChange = { priceText = it }, label = { Text("售价") }, singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next))
+                OutlinedTextField(value = soldText, onValueChange = { soldText = it }, label = { Text("销量") }, singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = unlimited, onCheckedChange = { unlimited = it })
+                    Text("无限库存")
                 }
-            }
+                if (!unlimited) {
+                    OutlinedTextField(value = stockText, onValueChange = { stockText = it }, label = { Text("库存") }, singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done))
+                }
+                OutlinedTextField(value = brief, onValueChange = { brief = it }, label = { Text("简介") })
+                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") })
+                OutlinedTextField(value = specs, onValueChange = { specs = it }, label = { Text("规格") })
+            }, actions = {
+                androidx.compose.material3.TextButton(onClick = { addOpen = false }) { Text("取消") }
+                androidx.compose.material3.TextButton(onClick = {
+                    val id = UUID.randomUUID().toString()
+                    val stockVal = if (unlimited) null else stockText.toIntOrNull()
+                    val priceVal = priceText.takeIf { it.isNotBlank() }?.toDoubleOrNull()
+                    val soldVal = soldText.toIntOrNull() ?: 0
+                    val item = CargoItem(
+                        id = id,
+                        name = name,
+                        category = category,
+                        stock = stockVal,
+                        price = priceVal,
+                        sold = soldVal,
+                        brief = brief,
+                        description = description,
+                        specs = specs,
+                        imageUrls = emptyList()
+                    )
+                    onAddItem(item)
+                    addOpen = false
+                }, enabled = canSave) { Text("保存") }
+            })
         }
     }
 }

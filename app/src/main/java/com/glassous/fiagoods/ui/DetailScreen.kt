@@ -64,6 +64,10 @@ import okhttp3.Request
 import coil.compose.AsyncImage
 import androidx.compose.material3.LinearProgressIndicator
 import com.glassous.fiagoods.data.model.CargoItem
+import com.glassous.fiagoods.ui.components.AppDialog
+import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
+import androidx.compose.material3.carousel.rememberCarouselState
+import androidx.compose.material3.carousel.CarouselDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -168,11 +172,11 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     if (editing) Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
                 } else if (item.imageUrls.size == 1) {
                     val url = item.imageUrls.first()
-                    Box(modifier = Modifier.fillMaxWidth().height(560.dp).clip(RoundedCornerShape(12.dp))) {
+                    Box(modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp).clip(RoundedCornerShape(12.dp))) {
                         AsyncImage(
                             model = url,
                             contentDescription = null,
-                            contentScale = ContentScale.Crop,
+                            contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize().clickable { previewUrl = url }
                         )
                         if (editing) {
@@ -211,20 +215,25 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                         }) { Text("下载全部图片") }
                     }
                 } else {
-                    val listState = rememberLazyListState()
-                    LazyRow(state = listState, modifier = Modifier.fillMaxWidth().heightIn(max = 560.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(item.imageUrls) { url ->
-                            Box(modifier = Modifier.width(480.dp).height(480.dp).clip(RoundedCornerShape(12.dp))) {
-                                AsyncImage(
-                                    model = url,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.matchParentSize().clickable { previewUrl = url }
-                                )
-                                if (editing) {
-                                    Row(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp), horizontalArrangement = Arrangement.End) {
-                                        IconButton(onClick = { deleteCandidateUrl = url }) { Icon(Icons.Filled.Close, contentDescription = null) }
-                                    }
+                    val state = rememberCarouselState { item.imageUrls.size }
+                    HorizontalMultiBrowseCarousel(
+                        state = state,
+                        preferredItemWidth = 220.dp,
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp),
+                        itemSpacing = 8.dp,
+                        flingBehavior = CarouselDefaults.singleAdvanceFlingBehavior(state)
+                    ) { itemIndex: Int ->
+                        val url = item.imageUrls[itemIndex]
+                        Box(modifier = Modifier.fillMaxHeight().clip(RoundedCornerShape(16.dp))) {
+                            AsyncImage(
+                                model = url,
+                                contentDescription = null,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize().clickable { previewUrl = url }
+                            )
+                            if (editing) {
+                                Row(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp), horizontalArrangement = Arrangement.End) {
+                                    IconButton(onClick = { deleteCandidateUrl = url }) { Icon(Icons.Filled.Close, contentDescription = null) }
                                 }
                             }
                         }
@@ -293,120 +302,89 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
         }
     }
     if (previewUrl != null) {
-        Dialog(onDismissRequest = { previewUrl = null }) {
-            Box(modifier = Modifier.fillMaxWidth().heightIn(max = 680.dp)) {
-                Card(elevation = CardDefaults.cardElevation()) {
-                    AsyncImage(model = previewUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)))
+        AppDialog(onDismiss = { previewUrl = null }, title = "图片预览", content = {
+            AsyncImage(model = previewUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)))
+        }, actions = {
+            androidx.compose.material3.TextButton(onClick = { previewUrl = null }) { Text("取消") }
+            androidx.compose.material3.TextButton(onClick = {
+                val fname = (item.name.ifBlank { "image" }) + ".jpg"
+                showSaveDialog = true
+                saving = true
+                saveProgress = 0f
+                saveError = null
+                scope.launch {
+                    val ok = withContext(Dispatchers.IO) { previewUrl?.let { saveToGallery(it, fname) } ?: false }
+                    saveProgress = 1f
+                    saving = false
+                    if (!ok) saveError = "保存失败"
                 }
-                Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(onClick = {
-                        val fname = (item.name.ifBlank { "image" }) + ".jpg"
-                        showSaveDialog = true
-                        saving = true
-                        saveProgress = 0f
-                        saveError = null
-                        scope.launch {
-                            val ok = withContext(Dispatchers.IO) { previewUrl?.let { saveToGallery(it, fname) } ?: false }
-                            saveProgress = 1f
-                            saving = false
-                            if (!ok) saveError = "保存失败"
-                        }
-                    }) { Icon(Icons.Filled.Download, contentDescription = null) }
-                    IconButton(onClick = { previewUrl = null }) { Icon(Icons.Filled.Close, contentDescription = null) }
-                }
-            }
-        }
+            }) { Text("下载") }
+        })
     }
     if (showUploadDialog) {
-        Dialog(onDismissRequest = { if (!uploading) { showUploadDialog = false } }) {
-            Card(elevation = CardDefaults.cardElevation()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("正在上传图片")
-                    LinearProgressIndicator(progress = uploadProgress, modifier = Modifier.fillMaxWidth())
-                    Text(((uploadProgress * 100).toInt()).toString() + "%")
-                    if (uploadError != null) {
-                        Text(uploadError!!, color = MaterialTheme.colorScheme.error)
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = { showUploadDialog = false }) { Text("关闭") }
-                        }
-                    }
-                }
+        AppDialog(onDismiss = { if (!uploading) { showUploadDialog = false } }, title = "正在上传图片", content = {
+            LinearProgressIndicator(progress = uploadProgress, modifier = Modifier.fillMaxWidth())
+            Text(((uploadProgress * 100).toInt()).toString() + "%")
+            if (uploadError != null) {
+                Text(uploadError!!, color = MaterialTheme.colorScheme.error)
             }
-        }
+        }, actions = {
+            androidx.compose.material3.TextButton(onClick = { showUploadDialog = false }, enabled = !uploading) { Text("关闭") }
+        })
     }
     if (deleteCandidateUrl != null) {
-        Dialog(onDismissRequest = { if (!uploading) { deleteCandidateUrl = null } }) {
-            Card(elevation = CardDefaults.cardElevation()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("确认删除该图片？")
-                    var deleting by remember { mutableStateOf(false) }
-                    var deleteProgress by remember { mutableStateOf(0f) }
-                    var deleteError by remember { mutableStateOf<String?>(null) }
-                    if (!deleting) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = { deleteCandidateUrl = null }) { Text("取消") }
-                            Button(onClick = {
-                                deleting = true
-                                deleteError = null
-                                deleteProgress = 0f
-                                onDeleteImageWithProgress(deleteCandidateUrl!!, { p ->
-                                    deleteProgress = p.coerceIn(0f, 1f)
-                                }, { ok, err ->
-                                    deleting = false
-                                    if (ok) {
-                                        deleteCandidateUrl = null
-                                    } else {
-                                        deleteError = err ?: "删除失败"
-                                    }
-                                })
-                            }) { Text("确定") }
-                        }
-                    } else {
-                        LinearProgressIndicator(progress = deleteProgress, modifier = Modifier.fillMaxWidth())
-                        Text(((deleteProgress * 100).toInt()).toString() + "%")
-                        if (deleteError != null) {
-                            Text(deleteError!!, color = MaterialTheme.colorScheme.error)
-                            Button(onClick = { deleteCandidateUrl = null }) { Text("关闭") }
-                        }
-                    }
+        var deleting by remember { mutableStateOf(false) }
+        var deleteProgress by remember { mutableStateOf(0f) }
+        var deleteError by remember { mutableStateOf<String?>(null) }
+        AppDialog(onDismiss = { if (!deleting) { deleteCandidateUrl = null } }, title = "确认删除该图片？", content = {
+            if (deleting) {
+                LinearProgressIndicator(progress = deleteProgress, modifier = Modifier.fillMaxWidth())
+                Text(((deleteProgress * 100).toInt()).toString() + "%")
+                if (deleteError != null) {
+                    Text(deleteError!!, color = MaterialTheme.colorScheme.error)
                 }
             }
-        }
+        }, actions = {
+            androidx.compose.material3.TextButton(onClick = { deleteCandidateUrl = null }, enabled = !deleting) { Text("取消") }
+            androidx.compose.material3.TextButton(onClick = {
+                deleting = true
+                deleteError = null
+                deleteProgress = 0f
+                onDeleteImageWithProgress(deleteCandidateUrl!!, { p ->
+                    deleteProgress = p.coerceIn(0f, 1f)
+                }, { ok, err ->
+                    deleting = false
+                    if (ok) {
+                        deleteCandidateUrl = null
+                    } else {
+                        deleteError = err ?: "删除失败"
+                    }
+                })
+            }, enabled = !deleting) { Text("删除") }
+        })
     }
     if (showSaveDialog) {
-        Dialog(onDismissRequest = { if (!saving) { showSaveDialog = false } }) {
-            Card(elevation = CardDefaults.cardElevation()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("正在保存图片")
-                    LinearProgressIndicator(progress = saveProgress, modifier = Modifier.fillMaxWidth())
-                    Text(((saveProgress * 100).toInt()).toString() + "%")
-                    if (saveError != null) {
-                        Text(saveError!!, color = MaterialTheme.colorScheme.error)
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = { showSaveDialog = false }) { Text("关闭") }
-                        }
-                    }
-                }
+        AppDialog(onDismiss = { if (!saving) { showSaveDialog = false } }, title = "正在保存图片", content = {
+            LinearProgressIndicator(progress = saveProgress, modifier = Modifier.fillMaxWidth())
+            Text(((saveProgress * 100).toInt()).toString() + "%")
+            if (saveError != null) {
+                Text(saveError!!, color = MaterialTheme.colorScheme.error)
             }
-        }
+        }, actions = {
+            androidx.compose.material3.TextButton(onClick = { showSaveDialog = false }, enabled = !saving) { Text("关闭") }
+        })
     }
     if (showDeleteConfirm) {
-        Dialog(onDismissRequest = { showDeleteConfirm = false }) {
-            Card(elevation = CardDefaults.cardElevation()) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("确认删除该商品？")
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = { showDeleteConfirm = false }) { Text("取消") }
-                        Button(onClick = {
-                            onDelete(item.id) { ok ->
-                                showDeleteConfirm = false
-                                if (ok) onBack()
-                            }
-                        }) { Text("确定") }
-                    }
+        AppDialog(onDismiss = { showDeleteConfirm = false }, title = "确认删除该商品？", content = {
+        }, actions = {
+            androidx.compose.material3.TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+            androidx.compose.material3.TextButton(onClick = {
+                onDelete(item.id) { ok ->
+                    showDeleteConfirm = false
+                    if (ok) onBack()
                 }
-            }
-        }
+            }) { Text("删除") }
+        })
     }
 }
 
