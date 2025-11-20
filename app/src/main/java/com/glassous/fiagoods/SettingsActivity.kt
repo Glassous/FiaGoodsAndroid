@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -23,12 +24,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -87,17 +91,25 @@ private fun SettingsScreen(mode: String, density: Int, onBack: () -> Unit, onMod
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) } }
             )
             Column(modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("主题模式", style = MaterialTheme.typography.titleMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onModeChange("system") }, enabled = mode != "system") { Text("跟随系统") }
-                    Button(onClick = { onModeChange("light") }, enabled = mode != "light") { Text("浅色") }
-                    Button(onClick = { onModeChange("dark") }, enabled = mode != "dark") { Text("深色") }
+                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("主题模式", style = MaterialTheme.typography.titleMedium)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { onModeChange("system") }, enabled = mode != "system", modifier = Modifier.weight(1f)) { Text("跟随系统") }
+                            Button(onClick = { onModeChange("light") }, enabled = mode != "light", modifier = Modifier.weight(1f)) { Text("浅色") }
+                            Button(onClick = { onModeChange("dark") }, enabled = mode != "dark", modifier = Modifier.weight(1f)) { Text("深色") }
+                        }
+                    }
                 }
-                Text("主页卡片密度", style = MaterialTheme.typography.titleMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { onDensityChange((density - 1).coerceAtLeast(0)) }) { Text("-") }
-                    Text(density.toString(), style = MaterialTheme.typography.titleLarge)
-                    Button(onClick = { onDensityChange((density + 1).coerceAtMost(10)) }) { Text("+") }
+                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("主页卡片密度", style = MaterialTheme.typography.titleMedium)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Button(onClick = { onDensityChange((density - 1).coerceAtLeast(0)) }, modifier = Modifier.weight(1f)) { Text("-") }
+                            Text(density.toString(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                            Button(onClick = { onDensityChange((density + 1).coerceAtMost(10)) }, modifier = Modifier.weight(1f)) { Text("+") }
+                        }
+                    }
                 }
             }
         }
