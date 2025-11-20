@@ -9,6 +9,8 @@ object SessionPrefs {
     private const val FILE = "fiagoods_secure_prefs"
     private const val KEY_VERIFIED = "verified"
     private const val KEY_PASSWORD = "password"
+    private const val KEY_THEME_MODE = "theme_mode"
+    private const val KEY_CARD_DENSITY = "card_density"
 
     private fun prefs(context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
@@ -28,5 +30,20 @@ object SessionPrefs {
     }
     fun clearVerified(context: Context) {
         prefs(context).edit().putBoolean(KEY_VERIFIED, false).remove(KEY_PASSWORD).apply()
+    }
+
+    fun getThemeMode(context: Context): String = prefs(context).getString(KEY_THEME_MODE, "system") ?: "system"
+    fun setThemeMode(context: Context, mode: String) {
+        val value = when (mode) {
+            "system", "light", "dark" -> mode
+            else -> "system"
+        }
+        prefs(context).edit().putString(KEY_THEME_MODE, value).apply()
+    }
+
+    fun getCardDensity(context: Context): Int = prefs(context).getInt(KEY_CARD_DENSITY, 3)
+    fun setCardDensity(context: Context, density: Int) {
+        val v = density.coerceIn(0, 10)
+        prefs(context).edit().putInt(KEY_CARD_DENSITY, v).apply()
     }
 }

@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.OutlinedTextField
@@ -66,6 +67,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
+import android.content.Intent
+import com.glassous.fiagoods.SettingsActivity
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -75,7 +78,8 @@ fun HomeScreen(
     onItemClick: (String) -> Unit,
     favorites: Set<String>,
     onToggleFavorite: (String) -> Unit,
-    onAddItemWithImage: (CargoItem, Uri?) -> Unit
+    onAddItemWithImage: (CargoItem, Uri?) -> Unit,
+    columnsPerRow: Int
 ) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var query by remember { mutableStateOf("") }
@@ -97,6 +101,12 @@ fun HomeScreen(
                 }
                 IconButton(onClick = { addOpen = true }) {
                     Icon(Icons.Filled.Add, contentDescription = null)
+                }
+                val context = LocalContext.current
+                IconButton(onClick = {
+                    context.startActivity(Intent(context, SettingsActivity::class.java))
+                }) {
+                    Icon(Icons.Filled.Settings, contentDescription = null)
                 }
             }
         )
@@ -132,7 +142,7 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     LazyVerticalStaggeredGrid(
-                        columns = StaggeredGridCells.Fixed(3),
+                        columns = StaggeredGridCells.Fixed(columnsPerRow.coerceAtLeast(1)),
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 12.dp + bottom),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

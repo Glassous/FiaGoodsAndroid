@@ -27,6 +27,10 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.glassous.fiagoods.ui.theme.FiaGoodsTheme
@@ -36,6 +40,10 @@ import com.glassous.fiagoods.ui.HomeScreen
 import com.glassous.fiagoods.data.SessionPrefs
 import com.glassous.fiagoods.ui.AuthScreen
 import com.glassous.fiagoods.ui.AuthViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.foundation.isSystemInDarkTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,7 +58,25 @@ class MainActivity : ComponentActivity() {
         flags = flags or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         window.decorView.systemUiVisibility = flags
         setContent {
-            FiaGoodsTheme {
+            val lifecycleOwner = LocalLifecycleOwner.current
+            var themeMode by remember { mutableStateOf(SessionPrefs.getThemeMode(this)) }
+            var cardDensity by remember { mutableStateOf(SessionPrefs.getCardDensity(this)) }
+            DisposableEffect(lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        themeMode = SessionPrefs.getThemeMode(this@MainActivity)
+                        cardDensity = SessionPrefs.getCardDensity(this@MainActivity)
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            }
+            val isDark = when (themeMode) {
+                "system" -> isSystemInDarkTheme()
+                "dark" -> true
+                else -> false
+            }
+            FiaGoodsTheme(darkTheme = isDark) {
                 val navController = rememberNavController()
                 val vm: GoodsViewModel = viewModel()
                 val snackbarHostState = remember { SnackbarHostState() }
@@ -102,7 +128,7 @@ class MainActivity : ComponentActivity() {
                                         vm.addImage(this@MainActivity, item.id, uri) { }
                                     }
                                 }
-                            })
+                            }, columnsPerRow = cardDensity)
                         }
                         composable(
                             route = "detail/{id}"
