@@ -34,7 +34,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.glassous.fiagoods.ui.theme.FiaGoodsTheme
-import com.glassous.fiagoods.ui.DetailScreen
 import com.glassous.fiagoods.ui.GoodsViewModel
 import com.glassous.fiagoods.ui.HomeScreen
 import com.glassous.fiagoods.data.SessionPrefs
@@ -118,8 +117,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             val favorites by vm.favorites.collectAsState()
-                            HomeScreen(items = items, loading = loading, onItemClick = { id ->
-                                navController.navigate("detail/$id")
+                            HomeScreen(items = items, loading = loading, onItemClick = { item ->
+                                val json = com.google.gson.Gson().toJson(item)
+                                startActivity(android.content.Intent(this@MainActivity, DetailActivity::class.java).putExtra("id", item.id).putExtra("item", json))
                             }, favorites = favorites, onToggleFavorite = { id ->
                                 vm.toggleFavorite(this@MainActivity, id) { }
                             }, onAddItemWithImage = { item, uri ->
@@ -129,25 +129,6 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }, columnsPerRow = cardDensity)
-                        }
-                        composable(
-                            route = "detail/{id}"
-                        ) { backStackEntry ->
-                            val id = backStackEntry.arguments?.getString("id") ?: ""
-                        val items by vm.items.collectAsState()
-                        val item = items.firstOrNull { it.id == id }
-                            if (item != null) {
-                                DetailScreen(
-                                    item = item,
-                                    onBack = { navController.popBackStack() },
-                                    onSave = { id, patch -> vm.updateItem(this@MainActivity, id, patch) { } },
-                                    onDelete = { id, cb -> vm.deleteItem(this@MainActivity, id) { ok -> cb(ok) } },
-                                    onAddImage = { uri -> vm.addImage(this@MainActivity, item.id, uri) { } },
-                                    onDeleteImage = { url -> vm.deleteImage(this@MainActivity, item.id, url) { } },
-                                    onAddImageWithProgress = { uri, onProgress, onDone -> vm.addImageWithProgress(this@MainActivity, item.id, uri, onProgress, onDone) },
-                                    onDeleteImageWithProgress = { url, onProgress, onDone -> vm.deleteImageWithProgress(this@MainActivity, item.id, url, onProgress, onDone) }
-                                )
-                            }
                         }
                     }
                 }

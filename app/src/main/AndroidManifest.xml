@@ -30,6 +30,11 @@
             android:exported="false"
             android:label="设置"
             android:theme="@style/Theme.FiaGoods" />
+        <activity
+            android:name=".DetailActivity"
+            android:exported="false"
+            android:label="详情"
+            android:theme="@style/Theme.FiaGoods" />
     </application>
 
 </manifest>

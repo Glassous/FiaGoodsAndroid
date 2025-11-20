@@ -279,4 +279,9 @@ class GoodsViewModel : ViewModel() {
             }
         }
     }
+
+    fun seedItems(items: List<CargoItem>) {
+        _items.value = items
+        _favorites.value = items.filter { it.isFavorite }.map { it.id }.toSet()
+    }
 }

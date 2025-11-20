@@ -75,7 +75,7 @@ import com.glassous.fiagoods.SettingsActivity
 fun HomeScreen(
     items: List<CargoItem>,
     loading: Boolean,
-    onItemClick: (String) -> Unit,
+    onItemClick: (CargoItem) -> Unit,
     favorites: Set<String>,
     onToggleFavorite: (String) -> Unit,
     onAddItemWithImage: (CargoItem, Uri?) -> Unit,
@@ -149,7 +149,7 @@ fun HomeScreen(
                         verticalItemSpacing = 8.dp
                     ) {
                         items(list) { item ->
-                            Card(elevation = CardDefaults.cardElevation(), modifier = Modifier.fillMaxWidth().combinedClickable(onClick = { onItemClick(item.id) }, onLongClick = {
+                            Card(elevation = CardDefaults.cardElevation(), modifier = Modifier.fillMaxWidth().combinedClickable(onClick = { onItemClick(item) }, onLongClick = {
                                 clipboard.setText(AnnotatedString(item.link))
                                 Toast.makeText(ctx, "链接已复制", Toast.LENGTH_SHORT).show()
                             })) {
