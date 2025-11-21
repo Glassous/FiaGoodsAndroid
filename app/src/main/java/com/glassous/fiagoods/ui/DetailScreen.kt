@@ -111,6 +111,11 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
     var pendingUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var showAddUrlDialog by remember { mutableStateOf(false) }
     var urlDialogText by remember { mutableStateOf("") }
+    var showBulkDeleteDialog by remember { mutableStateOf(false) }
+    var bulkDeleting by remember { mutableStateOf(false) }
+    var bulkProgress by remember { mutableStateOf(0f) }
+    var bulkError by remember { mutableStateOf<String?>(null) }
+    var bulkSelected by remember { mutableStateOf<Set<String>>(emptySet()) }
     val pickNew = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         val list = uris ?: emptyList()
         if (list.isNotEmpty()) {
@@ -169,7 +174,8 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
         return true
     }
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val hasDialog = previewUrl != null || showUploadDialog || deleteCandidateUrl != null || showSaveDialog || showDeleteConfirm
+    val clipboard = LocalClipboardManager.current
+    val hasDialog = previewUrl != null || showUploadDialog || deleteCandidateUrl != null || showSaveDialog || showDeleteConfirm || showBulkDeleteDialog
     Column(modifier = if (hasDialog) Modifier.fillMaxSize().blur(12.dp) else Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("详情") },
@@ -206,9 +212,25 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
         LazyColumn(modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 16.dp + bottom)) {
             item {
                 if (!editing) {
-                    Text(item.description, style = MaterialTheme.typography.displaySmall.copy(fontSize = 16.sp, lineHeight = 16.sp))
+                    var copied by remember { mutableStateOf(false) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(item.description, style = MaterialTheme.typography.displaySmall.copy(fontSize = 16.sp, lineHeight = 16.sp), modifier = Modifier.weight(1f))
+                        IconButton(onClick = {
+                            clipboard.setText(AnnotatedString(item.description))
+                            copied = true
+                        }) {
+                            Icon(imageVector = if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    }
                 } else {
-                    OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp))
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("描述") },
+                        singleLine = false,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp, max = 200.dp),
+                        shape = RoundedCornerShape(20.dp)
+                    )
                 }
             }
             item {
@@ -240,7 +262,10 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     }
                     Spacer(Modifier.height(8.dp))
                     if (editing) {
-                        Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
+                            Button(onClick = { bulkSelected = emptySet(); showBulkDeleteDialog = true }, enabled = item.imageUrls.isNotEmpty()) { Text("批量删除图片") }
+                        }
                         var urlInlineText by remember { mutableStateOf("") }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             OutlinedTextField(value = urlInlineText, onValueChange = { urlInlineText = it }, label = { Text("图片URL") }, modifier = Modifier.weight(1f), singleLine = false)
@@ -319,7 +344,10 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     }
                     Spacer(Modifier.height(8.dp))
                     if (editing) {
-                        Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
+                            Button(onClick = { bulkSelected = emptySet(); showBulkDeleteDialog = true }, enabled = item.imageUrls.isNotEmpty()) { Text("批量删除图片") }
+                        }
                         var urlInlineText by remember { mutableStateOf("") }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             OutlinedTextField(value = urlInlineText, onValueChange = { urlInlineText = it }, label = { Text("图片URL") }, modifier = Modifier.weight(1f), singleLine = false)
@@ -384,9 +412,9 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                         }
                     }
                 }
-                item { OutlinedTextField(value = link, onValueChange = { link = it }, label = { Text("链接") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
+                item { OutlinedTextField(value = link, onValueChange = { link = it }, label = { Text("链接") }, singleLine = false, modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp, max = 120.dp), shape = RoundedCornerShape(20.dp)) }
                 item { OutlinedTextField(value = priceText, onValueChange = { priceText = it }, label = { Text("售价") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
-                item { OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
+                
             }
             item {
                 Button(onClick = { showDeleteConfirm = true }) { Text("删除商品") }
@@ -404,6 +432,77 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     showAddUrlDialog = false
                     urlDialogText = ""
                 }) { Text("保存") }
+            })
+        }
+        if (showBulkDeleteDialog) {
+            AppDialog(onDismiss = { if (!bulkDeleting) { showBulkDeleteDialog = false } }, title = if (bulkDeleting) "正在批量删除图片" else "批量删除图片", content = {
+                if (!bulkDeleting) {
+                    val ctx = LocalContext.current
+                    val conf = LocalConfiguration.current
+                    val widthPx = (conf.screenWidthDp * ctx.resources.displayMetrics.density).toInt()
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item.imageUrls.forEach { u ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                androidx.compose.material3.Checkbox(checked = bulkSelected.contains(u), onCheckedChange = { checked ->
+                                    bulkSelected = if (checked) bulkSelected + u else bulkSelected - u
+                                })
+                                Spacer(Modifier.width(8.dp))
+                                Box(modifier = Modifier.height(64.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp))) {
+                                    val thumbUrl = buildOssThumbnailUrl(u, widthPx)
+                                    val request = ImageRequest.Builder(ctx)
+                                        .data(thumbUrl)
+                                        .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                                        .crossfade(true)
+                                        .build()
+                                    AsyncImage(model = request, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    LinearProgressIndicator(progress = bulkProgress, modifier = Modifier.fillMaxWidth())
+                    if (bulkError != null) {
+                        Text(bulkError!!, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }, actions = {
+                androidx.compose.material3.TextButton(onClick = { showBulkDeleteDialog = false }, enabled = !bulkDeleting) { Text("取消") }
+                androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showBulkDeleteDialog = false }, enabled = bulkDeleting) { Text("后台完成") }
+                androidx.compose.material3.TextButton(onClick = {
+                    if (bulkSelected.isNotEmpty()) {
+                        bulkDeleting = true
+                        bulkError = null
+                        bulkProgress = 0f
+                        UploadState.start("批量删除图片")
+                        val targets = bulkSelected.toList()
+                        var idx = 0
+                        fun deleteNext() {
+                            val total = targets.size
+                            val url = targets[idx]
+                            onDeleteImageWithProgress(url, { per ->
+                                bulkProgress = ((idx.toFloat()) + per).div(total.toFloat())
+                                UploadState.update(bulkProgress)
+                            }, { ok, err ->
+                                if (!ok) {
+                                    bulkDeleting = false
+                                    bulkError = err ?: "删除失败"
+                                    UploadState.setBackground(false)
+                                } else {
+                                    idx++
+                                    if (idx >= total) {
+                                        bulkDeleting = false
+                                        showBulkDeleteDialog = false
+                                        bulkSelected = emptySet()
+                                        UploadState.finish()
+                                    } else {
+                                        deleteNext()
+                                    }
+                                }
+                            })
+                        }
+                        deleteNext()
+                    }
+                }, enabled = !bulkDeleting) { Text("删除") }
             })
         }
     }
@@ -452,6 +551,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
         val bg = UploadState.background.collectAsState().value
         val up = UploadState.uploading.collectAsState().value
         val p = UploadState.progress.collectAsState().value
+        val lbl = UploadState.label.collectAsState().value
         if (bg && up) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Card(
@@ -462,7 +562,15 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                         .padding(16.dp)
                         .size(56.dp)
                         .clip(CircleShape)
-                        .clickable { showUploadDialog = true; UploadState.setBackground(false) }
+                        .clickable {
+                            val text = lbl ?: ""
+                            if (text.contains("删除")) {
+                                showBulkDeleteDialog = true
+                            } else {
+                                showUploadDialog = true
+                            }
+                            UploadState.setBackground(false)
+                        }
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(progress = p, modifier = Modifier.size(40.dp))
@@ -497,18 +605,23 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
             }
         }, actions = {
             androidx.compose.material3.TextButton(onClick = { deleteCandidateUrl = null }, enabled = !deleting) { Text("取消") }
+            androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); deleteCandidateUrl = null }, enabled = deleting) { Text("后台完成") }
             androidx.compose.material3.TextButton(onClick = {
                 deleting = true
                 deleteError = null
                 deleteProgress = 0f
+                UploadState.start("删除图片")
                 onDeleteImageWithProgress(deleteCandidateUrl!!, { p ->
                     deleteProgress = p.coerceIn(0f, 1f)
+                    UploadState.update(deleteProgress)
                 }, { ok, err ->
                     deleting = false
                     if (ok) {
                         deleteCandidateUrl = null
+                        UploadState.finish()
                     } else {
                         deleteError = err ?: "删除失败"
+                        UploadState.setBackground(false)
                     }
                 })
             }, enabled = !deleting) { Text("删除") }
@@ -596,7 +709,7 @@ private fun FieldCard(label: String, value: String) {
                 clipboard.setText(AnnotatedString(value))
                 copied = true
             }) {
-                Icon(imageVector = if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy, contentDescription = null)
+                Icon(imageVector = if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
             }
         }
     }

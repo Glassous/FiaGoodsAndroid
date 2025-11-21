@@ -151,10 +151,13 @@ class SupabaseApi {
                 .build()
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null
-                val resBody = resp.body?.string() ?: return null
+                val resBody = resp.body?.string()
+                if (resBody.isNullOrBlank()) {
+                    return fetchCargoItem(id)
+                }
                 val type = object : TypeToken<List<CargoItem>>() {}.type
                 val list = gson.fromJson<List<CargoItem>>(resBody, type) ?: emptyList()
-                list.firstOrNull()
+                if (list.isNotEmpty()) list.first() else fetchCargoItem(id)
             }
         } catch (e: Exception) {
             null
