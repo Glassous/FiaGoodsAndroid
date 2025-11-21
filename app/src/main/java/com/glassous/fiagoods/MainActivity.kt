@@ -43,6 +43,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.foundation.isSystemInDarkTheme
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.content.Context
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,7 +82,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val vm: GoodsViewModel = viewModel()
                 val snackbarHostState = remember { SnackbarHostState() }
-                val startDest = if (SessionPrefs.isVerified(this)) "home" else "auth"
+                val startDest = if (SessionPrefs.isVerified(this)) "home" else "auth?msg="
                 Scaffold(modifier = Modifier.fillMaxSize(), snackbarHost = { SnackbarHost(snackbarHostState) }, contentWindowInsets = WindowInsets(0)) { innerPadding ->
                     NavHost(navController = navController, startDestination = startDest, modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                         composable(
@@ -99,6 +102,15 @@ class MainActivity : ComponentActivity() {
                             val items by vm.items.collectAsState()
                             val loading by vm.loading.collectAsState()
                             LaunchedEffect(Unit) { vm.refresh(this@MainActivity) }
+                            DisposableEffect(Unit) {
+                                val receiver = object : BroadcastReceiver() {
+                                    override fun onReceive(context: Context, intent: android.content.Intent) {
+                                        vm.refresh(this@MainActivity, clearBeforeLoad = true)
+                                    }
+                                }
+                                registerReceiver(receiver, IntentFilter("com.glassous.fiagoods.REFRESH"), Context.RECEIVER_NOT_EXPORTED)
+                                onDispose { unregisterReceiver(receiver) }
+                            }
                             val msg by vm.authInvalidMessage.collectAsState()
                             val opMsg by vm.operationMessage.collectAsState()
                             LaunchedEffect(msg) {
@@ -128,7 +140,7 @@ class MainActivity : ComponentActivity() {
                                         vm.addImage(this@MainActivity, item.id, uri) { }
                                     }
                                 }
-                            }, columnsPerRow = cardDensity)
+                            }, columnsPerRow = cardDensity, onRefresh = { vm.refresh(this@MainActivity, clearBeforeLoad = true) })
                         }
                     }
                 }

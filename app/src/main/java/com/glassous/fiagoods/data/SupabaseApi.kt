@@ -12,62 +12,100 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 
 class SupabaseApi {
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .callTimeout(java.time.Duration.ofSeconds(20))
+        .connectTimeout(java.time.Duration.ofSeconds(10))
+        .readTimeout(java.time.Duration.ofSeconds(20))
+        .writeTimeout(java.time.Duration.ofSeconds(20))
+        .build()
     private val gson = Gson()
     private val baseRest = BuildConfig.SUPABASE_URL.trimEnd('/') + "/rest/v1"
     private val apiKey = BuildConfig.SUPABASE_ANON_KEY
 
     fun fetchCargoItems(): List<CargoItem> {
         if (baseRest.isBlank() || apiKey.isBlank()) return emptyList()
-        val url = "$baseRest/cargo_items?select=*"
-        val req = Request.Builder()
-            .url(url)
-            .addHeader("apikey", apiKey)
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Accept", "application/json")
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) return emptyList()
-            val body = resp.body?.string() ?: return emptyList()
-            val type = object : TypeToken<List<CargoItem>>() {}.type
-            return gson.fromJson<List<CargoItem>>(body, type) ?: emptyList()
+        return try {
+            val url = "$baseRest/cargo_items?select=*"
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("apikey", apiKey)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Accept", "application/json")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return emptyList()
+                val body = resp.body?.string() ?: return emptyList()
+                val type = object : TypeToken<List<CargoItem>>() {}.type
+                gson.fromJson<List<CargoItem>>(body, type) ?: emptyList()
+            }
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
     fun fetchCargoItem(id: String): CargoItem? {
         if (baseRest.isBlank() || apiKey.isBlank()) return null
-        val url = "$baseRest/cargo_items?id=eq.$id&select=*"
-        val req = Request.Builder()
-            .url(url)
-            .addHeader("apikey", apiKey)
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Accept", "application/json")
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) return null
-            val body = resp.body?.string() ?: return null
-            val type = object : TypeToken<List<CargoItem>>() {}.type
-            val list = gson.fromJson<List<CargoItem>>(body, type) ?: emptyList()
-            return list.firstOrNull()
+        return try {
+            val url = "$baseRest/cargo_items?id=eq.$id&select=*"
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("apikey", apiKey)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Accept", "application/json")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.string() ?: return null
+                val type = object : TypeToken<List<CargoItem>>() {}.type
+                val list = gson.fromJson<List<CargoItem>>(body, type) ?: emptyList()
+                list.firstOrNull()
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 
     fun fetchAppPassword(): String? {
         if (baseRest.isBlank() || apiKey.isBlank()) return null
-        val url = "$baseRest/app_secrets?key=eq.login_password&select=value"
-        val req = Request.Builder()
-            .url(url)
-            .addHeader("apikey", apiKey)
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Accept", "application/json")
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) return null
-            val body = resp.body?.string() ?: return null
-            val type = object : TypeToken<List<Map<String, String>>>() {}.type
-            val list = gson.fromJson<List<Map<String, String>>>(body, type) ?: emptyList()
-            val value = list.firstOrNull()?.get("value")
-            return value
+        return try {
+            val url = "$baseRest/app_secrets?key=eq.login_password&select=value"
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("apikey", apiKey)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Accept", "application/json")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val body = resp.body?.string() ?: return null
+                val type = object : TypeToken<List<Map<String, String>>>() {}.type
+                val list = gson.fromJson<List<Map<String, String>>>(body, type) ?: emptyList()
+                list.firstOrNull()?.get("value")
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun fetchOssConfig(): Map<String, String> {
+        if (baseRest.isBlank() || apiKey.isBlank()) return emptyMap()
+        return try {
+            val url = "$baseRest/app_secrets?or=(key.eq.oss_endpoint,key.eq.oss_bucket,key.eq.oss_access_key_id,key.eq.oss_access_key_secret,key.eq.oss_public_base_url)&select=key,value"
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("apikey", apiKey)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Accept", "application/json")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return emptyMap()
+                val body = resp.body?.string() ?: return emptyMap()
+                val type = object : TypeToken<List<Map<String, String>>>() {}.type
+                val list = gson.fromJson<List<Map<String, String>>>(body, type) ?: emptyList()
+                list.associate { (it["key"] ?: "") to (it["value"] ?: "") }.filterKeys { it.isNotBlank() }
+            }
+        } catch (e: Exception) {
+            emptyMap()
         }
     }
 
@@ -145,19 +183,23 @@ class SupabaseApi {
 
     fun fetchFavoriteItemIds(): List<String> {
         if (baseRest.isBlank() || apiKey.isBlank()) return emptyList()
-        val url = "$baseRest/favorite_items?select=item_id"
-        val req = Request.Builder()
-            .url(url)
-            .addHeader("apikey", apiKey)
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Accept", "application/json")
-            .build()
-        client.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) return emptyList()
-            val body = resp.body?.string() ?: return emptyList()
-            val type = object : TypeToken<List<Map<String, String>>>() {}.type
-            val list = gson.fromJson<List<Map<String, String>>>(body, type) ?: emptyList()
-            return list.mapNotNull { it["item_id"] }
+        return try {
+            val url = "$baseRest/favorite_items?select=item_id"
+            val req = Request.Builder()
+                .url(url)
+                .addHeader("apikey", apiKey)
+                .addHeader("Authorization", "Bearer $apiKey")
+                .addHeader("Accept", "application/json")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return emptyList()
+                val body = resp.body?.string() ?: return emptyList()
+                val type = object : TypeToken<List<Map<String, String>>>() {}.type
+                val list = gson.fromJson<List<Map<String, String>>>(body, type) ?: emptyList()
+                list.mapNotNull { it["item_id"] }
+            }
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 

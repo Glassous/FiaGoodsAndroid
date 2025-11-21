@@ -29,8 +29,9 @@ class GoodsViewModel : ViewModel() {
     private val _favorites = MutableStateFlow<Set<String>>(emptySet())
     val favorites: StateFlow<Set<String>> = _favorites
 
-    fun refresh(context: Context) {
+    fun refresh(context: Context, clearBeforeLoad: Boolean = false) {
         viewModelScope.launch {
+            if (clearBeforeLoad) { _items.value = emptyList() }
             _loading.value = true
             _authInvalidMessage.value = null
             if (!SessionPrefs.isVerified(context)) {
@@ -47,6 +48,15 @@ class GoodsViewModel : ViewModel() {
                 _loading.value = false
                 return@launch
             }
+            val ossCfg = withContext(Dispatchers.IO) { api.fetchOssConfig() }
+            SessionPrefs.setOssConfig(
+                context,
+                ossCfg["oss_endpoint"],
+                ossCfg["oss_bucket"],
+                ossCfg["oss_access_key_id"],
+                ossCfg["oss_access_key_secret"],
+                ossCfg["oss_public_base_url"]
+            )
             val res = withContext(Dispatchers.IO) { api.fetchCargoItems() }
             _items.value = res
             _favorites.value = res.filter { it.isFavorite }.map { it.id }.toSet()
@@ -122,7 +132,7 @@ class GoodsViewModel : ViewModel() {
         viewModelScope.launch {
             if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
             val item = findById(id) ?: run { onDone(false); return@launch }
-            if (BuildConfig.OSS_ENDPOINT.isBlank() || BuildConfig.OSS_BUCKET.isBlank() || BuildConfig.OSS_ACCESS_KEY_ID.isBlank() || BuildConfig.OSS_ACCESS_KEY_SECRET.isBlank() || BuildConfig.OSS_PUBLIC_BASE_URL.isBlank()) {
+            if (!hasOssConfig(context)) {
                 _operationMessage.value = "OSS 配置缺失"
                 onDone(false)
                 return@launch
@@ -163,7 +173,7 @@ class GoodsViewModel : ViewModel() {
     fun addImageWithProgress(context: Context, id: String, uri: Uri, onProgress: (Long, Long) -> Unit, onDone: (Boolean, String?) -> Unit) {
         if (!SessionPrefs.isVerified(context)) { onDone(false, "未验证") ; return }
         val item = findById(id) ?: run { onDone(false, "商品不存在"); return }
-        if (BuildConfig.OSS_ENDPOINT.isBlank() || BuildConfig.OSS_BUCKET.isBlank() || BuildConfig.OSS_ACCESS_KEY_ID.isBlank() || BuildConfig.OSS_ACCESS_KEY_SECRET.isBlank() || BuildConfig.OSS_PUBLIC_BASE_URL.isBlank()) {
+        if (!hasOssConfig(context)) {
             onDone(false, "OSS 配置缺失")
             return
         }
@@ -202,7 +212,7 @@ class GoodsViewModel : ViewModel() {
         viewModelScope.launch {
             if (!SessionPrefs.isVerified(context)) { onDone(false, "未验证"); return@launch }
             val item = findById(id) ?: run { onDone(false, "商品不存在"); return@launch }
-            if (BuildConfig.OSS_ENDPOINT.isBlank() || BuildConfig.OSS_BUCKET.isBlank() || BuildConfig.OSS_ACCESS_KEY_ID.isBlank() || BuildConfig.OSS_ACCESS_KEY_SECRET.isBlank() || BuildConfig.OSS_PUBLIC_BASE_URL.isBlank()) {
+            if (!hasOssConfig(context)) {
                 onDone(false, "OSS 配置缺失")
                 return@launch
             }
@@ -231,7 +241,7 @@ class GoodsViewModel : ViewModel() {
         viewModelScope.launch {
             if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
             val item = findById(id) ?: run { onDone(false); return@launch }
-            if (BuildConfig.OSS_ENDPOINT.isBlank() || BuildConfig.OSS_BUCKET.isBlank() || BuildConfig.OSS_ACCESS_KEY_ID.isBlank() || BuildConfig.OSS_ACCESS_KEY_SECRET.isBlank() || BuildConfig.OSS_PUBLIC_BASE_URL.isBlank()) {
+            if (!hasOssConfig(context)) {
                 _operationMessage.value = "OSS 配置缺失"
                 onDone(false)
                 return@launch
@@ -283,5 +293,14 @@ class GoodsViewModel : ViewModel() {
     fun seedItems(items: List<CargoItem>) {
         _items.value = items
         _favorites.value = items.filter { it.isFavorite }.map { it.id }.toSet()
+    }
+
+    private fun hasOssConfig(context: Context): Boolean {
+        val e = SessionPrefs.getOssEndpoint(context) ?: BuildConfig.OSS_ENDPOINT
+        val b = SessionPrefs.getOssBucket(context) ?: BuildConfig.OSS_BUCKET
+        val id = SessionPrefs.getOssAccessKeyId(context) ?: BuildConfig.OSS_ACCESS_KEY_ID
+        val s = SessionPrefs.getOssAccessKeySecret(context) ?: BuildConfig.OSS_ACCESS_KEY_SECRET
+        val u = SessionPrefs.getOssPublicBaseUrl(context) ?: BuildConfig.OSS_PUBLIC_BASE_URL
+        return listOf(e, b, id, s, u).all { it.isNotBlank() }
     }
 }

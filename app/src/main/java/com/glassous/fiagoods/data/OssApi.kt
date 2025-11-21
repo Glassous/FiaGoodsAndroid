@@ -15,7 +15,7 @@ import com.alibaba.sdk.android.oss.ServiceException
 import com.alibaba.sdk.android.oss.model.PutObjectResult
 
 class OssApi(private val context: Context) {
-    private val endpoint = BuildConfig.OSS_ENDPOINT
+    private val endpoint = SessionPrefs.getOssEndpoint(context) ?: BuildConfig.OSS_ENDPOINT
     private val secureEndpoint: String = run {
         val e = endpoint.trim()
         when {
@@ -25,10 +25,12 @@ class OssApi(private val context: Context) {
             else -> e
         }
     }
-    private val bucket = BuildConfig.OSS_BUCKET
-    private val baseUrl = BuildConfig.OSS_PUBLIC_BASE_URL
+    private val bucket = SessionPrefs.getOssBucket(context) ?: BuildConfig.OSS_BUCKET
+    private val baseUrl = SessionPrefs.getOssPublicBaseUrl(context) ?: BuildConfig.OSS_PUBLIC_BASE_URL
     private val client by lazy {
-        val provider = OSSPlainTextAKSKCredentialProvider(BuildConfig.OSS_ACCESS_KEY_ID, BuildConfig.OSS_ACCESS_KEY_SECRET)
+        val id = SessionPrefs.getOssAccessKeyId(context) ?: BuildConfig.OSS_ACCESS_KEY_ID
+        val secret = SessionPrefs.getOssAccessKeySecret(context) ?: BuildConfig.OSS_ACCESS_KEY_SECRET
+        val provider = OSSPlainTextAKSKCredentialProvider(id, secret)
         OSSClient(context, secureEndpoint, provider)
     }
 

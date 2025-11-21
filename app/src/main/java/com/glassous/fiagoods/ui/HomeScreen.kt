@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.OutlinedTextField
@@ -79,7 +80,8 @@ fun HomeScreen(
     favorites: Set<String>,
     onToggleFavorite: (String) -> Unit,
     onAddItemWithImage: (CargoItem, Uri?) -> Unit,
-    columnsPerRow: Int
+    columnsPerRow: Int,
+    onRefresh: () -> Unit
 ) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     var query by remember { mutableStateOf("") }
@@ -92,6 +94,9 @@ fun HomeScreen(
         TopAppBar(
             title = { Text("FiaGoods") },
             actions = {
+                IconButton(onClick = onRefresh) {
+                    Icon(imageVector = Icons.Filled.Refresh, contentDescription = null)
+                }
                 IconButton(onClick = { favoritesOnly = !favoritesOnly }) {
                     val tint = if (favoritesOnly) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface
                     Icon(imageVector = Icons.Filled.Star, contentDescription = null, tint = tint)
