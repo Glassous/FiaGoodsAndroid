@@ -21,6 +21,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,11 +61,15 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.PaddingValues
 import com.glassous.fiagoods.ui.components.AppDialog
 import androidx.compose.ui.platform.LocalContext
+import com.glassous.fiagoods.ui.global.UploadState
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import android.widget.Toast
+import coil.request.ImageRequest
+import com.glassous.fiagoods.util.buildOssThumbnailUrl
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
@@ -96,7 +101,8 @@ fun HomeScreen(
     var createProgress by remember { mutableStateOf(0f) }
     var createMessage by remember { mutableStateOf("") }
     var createError by remember { mutableStateOf<String?>(null) }
-    Column(modifier = if (addOpen || filterOpen) Modifier.fillMaxSize().blur(12.dp) else Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = if (addOpen || filterOpen) Modifier.fillMaxSize().blur(12.dp) else Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("FiaGoods") },
             actions = {
@@ -173,7 +179,16 @@ fun HomeScreen(
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                                     ) {
-                                        AsyncImage(model = previewUrl, contentDescription = null, contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxWidth())
+                                        val conf = LocalConfiguration.current
+                                        val widthPx = (conf.screenWidthDp * ctx.resources.displayMetrics.density).toInt()
+                                        val thumbUrl = previewUrl?.let { buildOssThumbnailUrl(it, widthPx) }
+                                        val request = ImageRequest.Builder(ctx)
+                                            .data(thumbUrl)
+                                            .size(widthPx, (widthPx * 9 / 16))
+                                            .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                                            .crossfade(true)
+                                            .build()
+                                        AsyncImage(model = request, contentDescription = null, contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxWidth())
                                         val tint = if (favorites.contains(item.id)) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface
                                         Box(
                                             modifier = Modifier
@@ -266,20 +281,24 @@ fun HomeScreen(
                     createProgress = 0f
                     createMessage = "正在创建商品数据…"
                     createError = null
+                    UploadState.start("新增商品")
                     val urlsList = imageUrlsText.lines().map { it.trim() }.filter { it.isNotBlank() }
                     onCreateItemWithImagesAndUrls(item, imageUris, urlsList, { done, total ->
                         val t = total.coerceAtLeast(1)
                         createProgress = done.toFloat() / t.toFloat()
                         createMessage = "已上传第" + done + "/" + total + "张"
+                        UploadState.update(createProgress)
                     }, { ok ->
                         creating = false
                         createProgress = 1f
                         if (!ok) {
                             createError = "创建或上传失败"
                         }
+                        UploadState.finish()
                     })
                     addOpen = false
                 }, enabled = canSave) { Text("保存") }
+                androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showCreateDialog = false }, enabled = creating) { Text("后台完成") }
             })
         }
 
@@ -294,6 +313,7 @@ fun HomeScreen(
                     Text(createError!!, color = MaterialTheme.colorScheme.error)
                 }
             }, actions = {
+                androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showCreateDialog = false }, enabled = creating) { Text("后台完成") }
                 androidx.compose.material3.TextButton(onClick = { showCreateDialog = false }, enabled = !creating) { Text("关闭") }
             })
         }
@@ -362,6 +382,28 @@ fun HomeScreen(
                 }) { Text("清空") }
                 androidx.compose.material3.TextButton(onClick = { filterOpen = false }) { Text("确定") }
             })
+        }
+        }
+        val bg = UploadState.background.collectAsState().value
+        val up = UploadState.uploading.collectAsState().value
+        val p = UploadState.progress.collectAsState().value
+        if (bg && up) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomEnd) {
+                Card(
+                    shape = CircleShape,
+                    elevation = CardDefaults.cardElevation(),
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .clickable { showCreateDialog = true; UploadState.setBackground(false) }
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(progress = p, modifier = Modifier.size(40.dp))
+                        Text(((p * 100).toInt()).toString() + "%", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
         }
     }
 }

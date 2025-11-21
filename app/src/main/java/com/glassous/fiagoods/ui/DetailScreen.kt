@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -64,6 +65,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import coil.compose.AsyncImage
+import coil.compose.AsyncImage
 import androidx.compose.material3.LinearProgressIndicator
 import com.glassous.fiagoods.data.model.CargoItem
 import com.glassous.fiagoods.ui.components.AppDialog
@@ -73,6 +75,12 @@ import androidx.compose.material3.carousel.CarouselDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
+import com.glassous.fiagoods.ui.global.UploadState
+import androidx.compose.ui.platform.LocalConfiguration
+import coil.request.ImageRequest
+import com.glassous.fiagoods.util.buildOssThumbnailUrl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,6 +99,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
     var uploading by remember { mutableStateOf(false) }
     var uploadProgress by remember { mutableStateOf(0f) }
     var uploadError by remember { mutableStateOf<String?>(null) }
+    var uploadInBackground by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var saveProgress by remember { mutableStateOf(0f) }
@@ -110,6 +119,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
             uploading = true
             uploadProgress = 0f
             uploadError = null
+            UploadState.start("图片上传")
             var idx = 0
             fun uploadNext() {
                 val total = pendingUris.size
@@ -117,15 +127,18 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 onAddImageWithProgress(target, { current, totalBytes ->
                     val per = if (totalBytes > 0) current.toFloat() / totalBytes.toFloat() else 0f
                     uploadProgress = (idx.toFloat() + per) / total.toFloat()
+                    UploadState.update(uploadProgress)
                 }, { ok, err ->
                     if (!ok) {
                         uploading = false
                         uploadError = err ?: "上传失败"
+                        UploadState.setBackground(false)
                     } else {
                         idx++
                         if (idx >= total) {
                             uploading = false
                             showUploadDialog = false
+                            UploadState.finish()
                         } else {
                             uploadNext()
                         }
@@ -204,8 +217,17 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 } else if (item.imageUrls.size == 1) {
                     val url = item.imageUrls.first()
                     Box(modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp).clip(RoundedCornerShape(12.dp))) {
+                        val ctx = LocalContext.current
+                        val conf = LocalConfiguration.current
+                        val widthPx = (conf.screenWidthDp * ctx.resources.displayMetrics.density).toInt()
+                        val thumbUrl = buildOssThumbnailUrl(url, widthPx)
+                        val request = ImageRequest.Builder(ctx)
+                            .data(thumbUrl)
+                            .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                            .crossfade(true)
+                            .build()
                         AsyncImage(
-                            model = url,
+                            model = request,
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).clickable { previewUrl = url }
@@ -265,8 +287,16 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                         val url = item.imageUrls[itemIndex]
                         val itemHeight = imageHeights[itemIndex] ?: 220.dp
                         Box(modifier = Modifier.height(itemHeight).fillMaxWidth().clip(RoundedCornerShape(16.dp))) {
+                            val ctx = LocalContext.current
+                            val widthPx = with(density) { 220.dp.toPx().toInt() }
+                            val thumbUrl = buildOssThumbnailUrl(url, widthPx)
+                            val request = ImageRequest.Builder(ctx)
+                                .data(thumbUrl)
+                                .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                                .crossfade(true)
+                                .build()
                             AsyncImage(
-                                model = url,
+                                model = request,
                                 contentDescription = null,
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).clickable { previewUrl = url },
@@ -379,7 +409,16 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
     }
     if (previewUrl != null) {
         AppDialog(onDismiss = { previewUrl = null }, title = "图片预览", content = {
-            AsyncImage(model = previewUrl, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)))
+            val ctx = LocalContext.current
+            val conf = LocalConfiguration.current
+            val widthPx = (conf.screenWidthDp * ctx.resources.displayMetrics.density).toInt()
+            val thumbUrl = buildOssThumbnailUrl(previewUrl!!, widthPx)
+            val request = ImageRequest.Builder(ctx)
+                .data(thumbUrl)
+                .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                .crossfade(true)
+                .build()
+            AsyncImage(model = request, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)))
         }, actions = {
             androidx.compose.material3.TextButton(onClick = { previewUrl = null }) { Text("取消") }
             androidx.compose.material3.TextButton(onClick = {
@@ -405,8 +444,33 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 Text(uploadError!!, color = MaterialTheme.colorScheme.error)
             }
         }, actions = {
+            androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showUploadDialog = false }, enabled = uploading) { Text("后台完成") }
             androidx.compose.material3.TextButton(onClick = { showUploadDialog = false }, enabled = !uploading) { Text("关闭") }
         })
+    }
+    run {
+        val bg = UploadState.background.collectAsState().value
+        val up = UploadState.uploading.collectAsState().value
+        val p = UploadState.progress.collectAsState().value
+        if (bg && up) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Card(
+                    shape = CircleShape,
+                    elevation = CardDefaults.cardElevation(),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .clickable { showUploadDialog = true; UploadState.setBackground(false) }
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(progress = p, modifier = Modifier.size(40.dp))
+                        Text(((p * 100).toInt()).toString() + "%", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
     }
     if (showItemSaveDialog) {
         AppDialog(onDismiss = { if (!savingItem) { showItemSaveDialog = false } }, title = "正在保存商品", content = {
@@ -496,6 +560,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
     LaunchedEffect(uploadProgress, uploading) {
         if (!uploading && uploadProgress >= 1f) {
             showUploadDialog = false
+            UploadState.setBackground(false)
         }
     }
     LaunchedEffect(itemSaveProgress, savingItem) {
