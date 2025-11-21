@@ -134,26 +134,38 @@ class MainActivity : ComponentActivity() {
                                 startActivity(android.content.Intent(this@MainActivity, DetailActivity::class.java).putExtra("id", item.id).putExtra("item", json))
                             }, favorites = favorites, onToggleFavorite = { id ->
                                 vm.toggleFavorite(this@MainActivity, id) { }
-                            }, onCreateItemWithImages = { item, uris, onProgress, onDone ->
+                            }, onCreateItemWithImagesAndUrls = { item, uris, urls, onProgress, onDone ->
                                 vm.addItem(this@MainActivity, item) { ok, created ->
-                                    if (!ok) { onDone(false); return@addItem }
-                                    val targetId = (created?.id) ?: item.id
-                                    val total = uris.size
-                                    if (total == 0) { onDone(true); return@addItem }
-                                    var uploaded = 0
-                                    fun uploadNext() {
-                                        val u = uris[uploaded]
-                                        vm.addImage(this@MainActivity, targetId, u) { ok2 ->
-                                            if (!ok2) { onDone(false) } else {
-                                                uploaded++
-                                                onProgress(uploaded, total)
-                                                if (uploaded >= total) { onDone(true) } else { uploadNext() }
+                                    if (!ok) {
+                                        onDone(false)
+                                    } else {
+                                        val targetId = (created?.id) ?: item.id
+                                        vm.addImageUrlsDirect(this@MainActivity, targetId, urls) { okUrls ->
+                                            val total = uris.size
+                                            if (total == 0) {
+                                                onDone(okUrls)
+                                            } else {
+                                                var uploaded = 0
+                                                fun uploadNext() {
+                                                    val u = uris[uploaded]
+                                                    vm.addImage(this@MainActivity, targetId, u) { ok2 ->
+                                                        if (!ok2) {
+                                                            onDone(false)
+                                                        } else {
+                                                            uploaded++
+                                                            onProgress(uploaded, total)
+                                                            if (uploaded >= total) { onDone(true) } else { uploadNext() }
+                                                        }
+                                                    }
+                                                }
+                                                onProgress(0, total)
+                                                uploadNext()
                                             }
                                         }
                                     }
-                                    onProgress(0, total)
-                                    uploadNext()
                                 }
+                            }, onAddImageUrlsDirect = { id, urls, done ->
+                                vm.addImageUrlsDirect(this@MainActivity, id, urls) { ok -> done(ok) }
                             }, columnsPerRow = cardDensity, onRefresh = { vm.refresh(this@MainActivity, clearBeforeLoad = true) })
                         }
                     }

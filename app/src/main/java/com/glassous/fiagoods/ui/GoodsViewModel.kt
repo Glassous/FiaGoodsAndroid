@@ -207,6 +207,54 @@ class GoodsViewModel : ViewModel() {
         }
     }
 
+    fun addImageUrlDirect(context: Context, id: String, url: String, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
+            val item = findById(id) ?: run { onDone(false); return@launch }
+            val normalized = url.trim()
+            if (normalized.isBlank()) { onDone(false); return@launch }
+            try {
+                val newList = item.imageUrls + normalized
+                val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, mapOf("image_urls" to newList)) }
+                if (updated != null) {
+                    _items.value = _items.value.map { if (it.id == id) updated else it }
+                    _operationMessage.value = "图片URL添加成功"
+                    onDone(true)
+                } else {
+                    _operationMessage.value = "图片保存失败"
+                    onDone(false)
+                }
+            } catch (e: Exception) {
+                _operationMessage.value = "图片保存异常"
+                onDone(false)
+            }
+        }
+    }
+
+    fun addImageUrlsDirect(context: Context, id: String, urls: List<String>, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
+            var item = findById(id) ?: run { onDone(false); return@launch }
+            val list = urls.map { it.trim() }.filter { it.isNotBlank() }
+            if (list.isEmpty()) { onDone(true); return@launch }
+            try {
+                var current = item
+                for (u in list) {
+                    val newList = current.imageUrls + u
+                    val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, mapOf("image_urls" to newList)) }
+                    if (updated == null) { _operationMessage.value = "图片保存失败"; onDone(false); return@launch }
+                    _items.value = _items.value.map { if (it.id == id) updated else it }
+                    current = updated
+                }
+                _operationMessage.value = "图片URL添加成功"
+                onDone(true)
+            } catch (e: Exception) {
+                _operationMessage.value = "图片保存异常"
+                onDone(false)
+            }
+        }
+    }
+
     fun addImageWithProgress(context: Context, id: String, uri: Uri, onProgress: (Long, Long) -> Unit, onDone: (Boolean, String?) -> Unit) {
         if (!SessionPrefs.isVerified(context)) { onDone(false, "未验证") ; return }
         val item = findById(id) ?: run { onDone(false, "商品不存在"); return }

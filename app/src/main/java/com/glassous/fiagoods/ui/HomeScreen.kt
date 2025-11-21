@@ -79,7 +79,8 @@ fun HomeScreen(
     onItemClick: (CargoItem) -> Unit,
     favorites: Set<String>,
     onToggleFavorite: (String) -> Unit,
-    onCreateItemWithImages: (CargoItem, List<Uri>, (Int, Int) -> Unit, (Boolean) -> Unit) -> Unit,
+    onCreateItemWithImagesAndUrls: (CargoItem, List<Uri>, List<String>, (Int, Int) -> Unit, (Boolean) -> Unit) -> Unit,
+    onAddImageUrlsDirect: (String, List<String>, (Boolean) -> Unit) -> Unit,
     columnsPerRow: Int,
     onRefresh: () -> Unit
 ) {
@@ -206,12 +207,33 @@ fun HomeScreen(
             var link by remember { mutableStateOf("") }
             var priceText by remember { mutableStateOf("") }
             var imageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+            var imageUrlsText by remember { mutableStateOf("") }
             val pickImages = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> imageUris = uris ?: emptyList() }
             val canSave = true
             AppDialog(onDismiss = { addOpen = false }, title = "新增商品", content = {
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") }, singleLine = true)
-                OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true)
-                OutlinedTextField(value = groupName, onValueChange = { groupName = it }, label = { Text("分组") }, singleLine = true)
+                val groupOptions = remember(items) { items.map { it.groupName }.filter { it.isNotBlank() }.distinct().sorted() }
+                val categoryOptions = remember(items) { items.map { it.category }.filter { it.isNotBlank() }.distinct().sorted() }
+                var categoryExpanded by remember { mutableStateOf(false) }
+                val filteredCategories = remember(categoryOptions, category) { if (category.isBlank()) categoryOptions else categoryOptions.filter { it.contains(category, true) } }
+                Box {
+                    OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true, trailingIcon = { IconButton(onClick = { categoryExpanded = !categoryExpanded }) { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) } })
+                    androidx.compose.material3.DropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }) {
+                        filteredCategories.forEach { c ->
+                            androidx.compose.material3.DropdownMenuItem(text = { Text(c) }, onClick = { category = c; categoryExpanded = false })
+                        }
+                    }
+                }
+                var groupExpanded by remember { mutableStateOf(false) }
+                val filteredGroups = remember(groupOptions, groupName) { if (groupName.isBlank()) groupOptions else groupOptions.filter { it.contains(groupName, true) } }
+                Box {
+                    OutlinedTextField(value = groupName, onValueChange = { groupName = it }, label = { Text("分组") }, singleLine = true, trailingIcon = { IconButton(onClick = { groupExpanded = !groupExpanded }) { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) } })
+                    androidx.compose.material3.DropdownMenu(expanded = groupExpanded, onDismissRequest = { groupExpanded = false }) {
+                        filteredGroups.forEach { g ->
+                            androidx.compose.material3.DropdownMenuItem(text = { Text(g) }, onClick = { groupName = g; groupExpanded = false })
+                        }
+                    }
+                }
                 OutlinedTextField(value = link, onValueChange = { link = it }, label = { Text("链接") }, singleLine = true)
                 OutlinedTextField(value = priceText, onValueChange = { priceText = it }, label = { Text("售价") }, singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done))
                 Spacer(Modifier.height(8.dp))
@@ -222,6 +244,9 @@ fun HomeScreen(
                         Text("已选择" + imageUris.size + "张", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(value = imageUrlsText, onValueChange = { imageUrlsText = it }, label = { Text("图片URL（多行，每行一个）") }, singleLine = false)
+                Text("提示：换行为多个", style = MaterialTheme.typography.bodySmall)
             }, actions = {
                 androidx.compose.material3.TextButton(onClick = { addOpen = false }) { Text("取消") }
                 androidx.compose.material3.TextButton(onClick = {
@@ -241,7 +266,8 @@ fun HomeScreen(
                     createProgress = 0f
                     createMessage = "正在创建商品数据…"
                     createError = null
-                    onCreateItemWithImages(item, imageUris, { done, total ->
+                    val urlsList = imageUrlsText.lines().map { it.trim() }.filter { it.isNotBlank() }
+                    onCreateItemWithImagesAndUrls(item, imageUris, urlsList, { done, total ->
                         val t = total.coerceAtLeast(1)
                         createProgress = done.toFloat() / t.toFloat()
                         createMessage = "已上传第" + done + "/" + total + "张"

@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.Icons
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -68,10 +70,13 @@ import com.glassous.fiagoods.ui.components.AppDialog
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.carousel.CarouselDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<String, Any?>, (Boolean) -> Unit) -> Unit, onDelete: (String, (Boolean) -> Unit) -> Unit, onAddImage: (Uri) -> Unit, onDeleteImage: (String) -> Unit, onAddImageWithProgress: (Uri, (Long, Long) -> Unit, (Boolean, String?) -> Unit) -> Unit, onDeleteImageWithProgress: (String, (Float) -> Unit, (Boolean, String?) -> Unit) -> Unit) {
+fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<String, Any?>, (Boolean) -> Unit) -> Unit, onDelete: (String, (Boolean) -> Unit) -> Unit, onAddImage: (Uri) -> Unit, onDeleteImage: (String) -> Unit, onAddImageWithProgress: (Uri, (Long, Long) -> Unit, (Boolean, String?) -> Unit) -> Unit, onDeleteImageWithProgress: (String, (Float) -> Unit, (Boolean, String?) -> Unit) -> Unit, onAddImageUrlsDirect: (List<String>, (Boolean) -> Unit) -> Unit, groupOptions: List<String> = emptyList(), categoryOptions: List<String> = emptyList()) {
     var previewUrl by remember { mutableStateOf<String?>(null) }
     val ctx = LocalContext.current
     var editing by remember { mutableStateOf(false) }
@@ -95,6 +100,8 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
     var itemSaveProgress by remember { mutableStateOf(0f) }
     var itemSaveError by remember { mutableStateOf<String?>(null) }
     var pendingUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var showAddUrlDialog by remember { mutableStateOf(false) }
+    var urlDialogText by remember { mutableStateOf("") }
     val pickNew = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         val list = uris ?: emptyList()
         if (list.isNotEmpty()) {
@@ -186,7 +193,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
         LazyColumn(modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 16.dp + bottom)) {
             item {
                 if (!editing) {
-                    Text(item.description, style = MaterialTheme.typography.displaySmall)
+                    Text(item.description, style = MaterialTheme.typography.displaySmall.copy(fontSize = 16.sp, lineHeight = 16.sp))
                 } else {
                     OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp))
                 }
@@ -212,6 +219,12 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     Spacer(Modifier.height(8.dp))
                     if (editing) {
                         Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
+                        var urlInlineText by remember { mutableStateOf("") }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedTextField(value = urlInlineText, onValueChange = { urlInlineText = it }, label = { Text("图片URL") }, modifier = Modifier.weight(1f), singleLine = false)
+                            Spacer(Modifier.width(8.dp))
+                            IconButton(onClick = { showAddUrlDialog = true }) { Icon(Icons.Filled.Add, contentDescription = null) }
+                        }
                     } else {
                         Button(onClick = {
                             showSaveDialog = true
@@ -240,20 +253,32 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     }
                 } else {
                     val state = rememberCarouselState { item.imageUrls.size }
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    var imageHeights by remember { mutableStateOf<Map<Int, androidx.compose.ui.unit.Dp>>(emptyMap()) }
                     HorizontalMultiBrowseCarousel(
                         state = state,
                         preferredItemWidth = 220.dp,
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp).clip(RoundedCornerShape(16.dp)),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
                         itemSpacing = 8.dp,
                         flingBehavior = CarouselDefaults.singleAdvanceFlingBehavior(state)
                     ) { itemIndex: Int ->
                         val url = item.imageUrls[itemIndex]
-                        Box(modifier = Modifier.fillMaxHeight().clip(RoundedCornerShape(16.dp))) {
+                        val itemHeight = imageHeights[itemIndex] ?: 220.dp
+                        Box(modifier = Modifier.height(itemHeight).fillMaxWidth().clip(RoundedCornerShape(16.dp))) {
                             AsyncImage(
                                 model = url,
                                 contentDescription = null,
                                 contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).clickable { previewUrl = url }
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).clickable { previewUrl = url },
+                                onSuccess = { success ->
+                                    val dw = success.result.drawable.intrinsicWidth
+                                    val dh = success.result.drawable.intrinsicHeight
+                                    if (dw > 0 && dh > 0) {
+                                        val hPx = with(density) { 220.dp.toPx() } * (dh.toFloat() / dw.toFloat())
+                                        val hDp = with(density) { hPx.toDp() }
+                                        imageHeights = imageHeights + (itemIndex to hDp)
+                                    }
+                                }
                             )
                             if (editing) {
                                 Row(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp), horizontalArrangement = Arrangement.End) {
@@ -265,6 +290,12 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     Spacer(Modifier.height(8.dp))
                     if (editing) {
                         Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
+                        var urlInlineText by remember { mutableStateOf("") }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedTextField(value = urlInlineText, onValueChange = { urlInlineText = it }, label = { Text("图片URL") }, modifier = Modifier.weight(1f), singleLine = false)
+                            Spacer(Modifier.width(8.dp))
+                            IconButton(onClick = { showAddUrlDialog = true }) { Icon(Icons.Filled.Add, contentDescription = null) }
+                        }
                     } else {
                         Button(onClick = {
                             showSaveDialog = true
@@ -299,17 +330,51 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 item { FieldCard(label = "分组", value = item.groupName) }
                 item { FieldCard(label = "链接", value = item.link) }
             } else {
-                item { OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
-                item { OutlinedTextField(value = groupName, onValueChange = { groupName = it }, label = { Text("分组") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
+                item {
+                    var categoryExpanded by remember { mutableStateOf(false) }
+                    val filteredCategories = remember(categoryOptions, category) { if (category.isBlank()) categoryOptions else categoryOptions.filter { it.contains(category, true) } }
+                    Box {
+                        OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), trailingIcon = { IconButton(onClick = { categoryExpanded = !categoryExpanded }) { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) } })
+                        DropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }) {
+                            filteredCategories.forEach { c ->
+                                DropdownMenuItem(text = { Text(c) }, onClick = { category = c; categoryExpanded = false })
+                            }
+                        }
+                    }
+                }
+                item {
+                    var groupExpanded by remember { mutableStateOf(false) }
+                    val filteredGroups = remember(groupOptions, groupName) { if (groupName.isBlank()) groupOptions else groupOptions.filter { it.contains(groupName, true) } }
+                    Box {
+                        OutlinedTextField(value = groupName, onValueChange = { groupName = it }, label = { Text("分组") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), trailingIcon = { IconButton(onClick = { groupExpanded = !groupExpanded }) { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) } })
+                        DropdownMenu(expanded = groupExpanded, onDismissRequest = { groupExpanded = false }) {
+                            filteredGroups.forEach { g ->
+                                DropdownMenuItem(text = { Text(g) }, onClick = { groupName = g; groupExpanded = false })
+                            }
+                        }
+                    }
+                }
                 item { OutlinedTextField(value = link, onValueChange = { link = it }, label = { Text("链接") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
                 item { OutlinedTextField(value = priceText, onValueChange = { priceText = it }, label = { Text("售价") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
                 item { OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) }
             }
-            if (editing) {
-                item {
-                    Button(onClick = { showDeleteConfirm = true }) { Text("删除商品") }
-                }
+            item {
+                Button(onClick = { showDeleteConfirm = true }) { Text("删除商品") }
             }
+        }
+        if (showAddUrlDialog) {
+            AppDialog(onDismiss = { showAddUrlDialog = false }, title = "添加图片URL", content = {
+                OutlinedTextField(value = urlDialogText, onValueChange = { urlDialogText = it }, label = { Text("每行一个URL") }, modifier = Modifier.fillMaxWidth(), singleLine = false)
+                Text("提示：换行为多个")
+            }, actions = {
+                androidx.compose.material3.TextButton(onClick = { showAddUrlDialog = false }) { Text("取消") }
+                androidx.compose.material3.TextButton(onClick = {
+                    val urls = urlDialogText.lines().map { it.trim() }.filter { it.isNotBlank() }
+                    onAddImageUrlsDirect(urls) { }
+                    showAddUrlDialog = false
+                    urlDialogText = ""
+                }) { Text("保存") }
+            })
         }
     }
     if (previewUrl != null) {

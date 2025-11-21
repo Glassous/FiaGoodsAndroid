@@ -94,7 +94,10 @@ class DetailActivity : ComponentActivity() {
                             onAddImage = { uri -> vm.addImage(this@DetailActivity, item.id, uri) { } },
                             onDeleteImage = { url -> vm.deleteImage(this@DetailActivity, item.id, url) { } },
                             onAddImageWithProgress = { uri, onProgress, onDone -> vm.addImageWithProgress(this@DetailActivity, item.id, uri, onProgress, onDone) },
-                            onDeleteImageWithProgress = { url, onProgress, onDone -> vm.deleteImageWithProgress(this@DetailActivity, item.id, url, onProgress, onDone) }
+                            onDeleteImageWithProgress = { url, onProgress, onDone -> vm.deleteImageWithProgress(this@DetailActivity, item.id, url, onProgress, onDone) },
+                            onAddImageUrlsDirect = { urls, done -> vm.addImageUrlsDirect(this@DetailActivity, item.id, urls) { ok -> done(ok) } },
+                            groupOptions = items.map { it.groupName }.filter { it.isNotBlank() }.distinct().sorted(),
+                            categoryOptions = items.map { it.category }.filter { it.isNotBlank() }.distinct().sorted()
                         )
                     }
                 }
