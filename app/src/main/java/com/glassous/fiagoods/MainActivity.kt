@@ -134,10 +134,11 @@ class MainActivity : ComponentActivity() {
                                 startActivity(android.content.Intent(this@MainActivity, DetailActivity::class.java).putExtra("id", item.id).putExtra("item", json))
                             }, favorites = favorites, onToggleFavorite = { id ->
                                 vm.toggleFavorite(this@MainActivity, id) { }
-                            }, onAddItemWithImage = { item, uri ->
-                                vm.addItem(this@MainActivity, item) { ok ->
-                                    if (ok && uri != null) {
-                                        vm.addImage(this@MainActivity, item.id, uri) { }
+                            }, onAddItemWithImages = { item, uris ->
+                                vm.addItem(this@MainActivity, item) { ok, created ->
+                                    if (ok) {
+                                        val targetId = (created?.id) ?: item.id
+                                        vm.addImages(this@MainActivity, targetId, uris) { }
                                     }
                                 }
                             }, columnsPerRow = cardDensity, onRefresh = { vm.refresh(this@MainActivity, clearBeforeLoad = true) })

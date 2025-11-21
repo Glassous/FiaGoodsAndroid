@@ -71,7 +71,7 @@ import androidx.compose.material3.carousel.CarouselDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<String, Any?>) -> Unit, onDelete: (String, (Boolean) -> Unit) -> Unit, onAddImage: (Uri) -> Unit, onDeleteImage: (String) -> Unit, onAddImageWithProgress: (Uri, (Long, Long) -> Unit, (Boolean, String?) -> Unit) -> Unit, onDeleteImageWithProgress: (String, (Float) -> Unit, (Boolean, String?) -> Unit) -> Unit) {
+fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<String, Any?>, (Boolean) -> Unit) -> Unit, onDelete: (String, (Boolean) -> Unit) -> Unit, onAddImage: (Uri) -> Unit, onDeleteImage: (String) -> Unit, onAddImageWithProgress: (Uri, (Long, Long) -> Unit, (Boolean, String?) -> Unit) -> Unit, onDeleteImageWithProgress: (String, (Float) -> Unit, (Boolean, String?) -> Unit) -> Unit) {
     var previewUrl by remember { mutableStateOf<String?>(null) }
     val ctx = LocalContext.current
     var editing by remember { mutableStateOf(false) }
@@ -90,22 +90,42 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
     var saving by remember { mutableStateOf(false) }
     var saveProgress by remember { mutableStateOf(0f) }
     var saveError by remember { mutableStateOf<String?>(null) }
-    val pickNew = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
+    var showItemSaveDialog by remember { mutableStateOf(false) }
+    var savingItem by remember { mutableStateOf(false) }
+    var itemSaveProgress by remember { mutableStateOf(0f) }
+    var itemSaveError by remember { mutableStateOf<String?>(null) }
+    var pendingUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    val pickNew = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        val list = uris ?: emptyList()
+        if (list.isNotEmpty()) {
+            pendingUris = list
             showUploadDialog = true
             uploading = true
             uploadProgress = 0f
             uploadError = null
-            onAddImageWithProgress(uri, { current, total ->
-                uploadProgress = if (total > 0) current.toFloat() / total.toFloat() else 0f
-            }, { ok, err ->
-                uploading = false
-                if (ok) {
-                    showUploadDialog = false
-                } else {
-                    uploadError = err ?: "上传失败"
-                }
-            })
+            var idx = 0
+            fun uploadNext() {
+                val total = pendingUris.size
+                val target = pendingUris[idx]
+                onAddImageWithProgress(target, { current, totalBytes ->
+                    val per = if (totalBytes > 0) current.toFloat() / totalBytes.toFloat() else 0f
+                    uploadProgress = (idx.toFloat() + per) / total.toFloat()
+                }, { ok, err ->
+                    if (!ok) {
+                        uploading = false
+                        uploadError = err ?: "上传失败"
+                    } else {
+                        idx++
+                        if (idx >= total) {
+                            uploading = false
+                            showUploadDialog = false
+                        } else {
+                            uploadNext()
+                        }
+                    }
+                })
+            }
+            uploadNext()
         }
     }
     
@@ -147,7 +167,17 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                         patch["group_name"] = groupName
                         patch["link"] = link
                         patch["price"] = priceText.toDoubleOrNull()
-                        onSave(item.id, patch)
+                        showItemSaveDialog = true
+                        savingItem = true
+                        itemSaveProgress = 0f
+                        itemSaveError = null
+                        onSave(item.id, patch) { ok ->
+                            savingItem = false
+                            itemSaveProgress = 1f
+                            if (!ok) {
+                                itemSaveError = "保存失败"
+                            }
+                        }
                         editing = false
                     }, enabled = canSave) { Icon(Icons.Filled.Save, contentDescription = null) }
                 }
@@ -313,6 +343,17 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
             androidx.compose.material3.TextButton(onClick = { showUploadDialog = false }, enabled = !uploading) { Text("关闭") }
         })
     }
+    if (showItemSaveDialog) {
+        AppDialog(onDismiss = { if (!savingItem) { showItemSaveDialog = false } }, title = "正在保存商品", content = {
+            LinearProgressIndicator(progress = itemSaveProgress, modifier = Modifier.fillMaxWidth())
+            Text(((itemSaveProgress * 100).toInt()).toString() + "%")
+            if (itemSaveError != null) {
+                Text(itemSaveError!!, color = MaterialTheme.colorScheme.error)
+            }
+        }, actions = {
+            androidx.compose.material3.TextButton(onClick = { showItemSaveDialog = false }, enabled = !savingItem) { Text("关闭") }
+        })
+    }
     if (deleteCandidateUrl != null) {
         var deleting by remember { mutableStateOf(false) }
         var deleteProgress by remember { mutableStateOf(0f) }
@@ -356,16 +397,51 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
         })
     }
     if (showDeleteConfirm) {
-        AppDialog(onDismiss = { showDeleteConfirm = false }, title = "确认删除该商品？", content = {
-        }, actions = {
-            androidx.compose.material3.TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
-            androidx.compose.material3.TextButton(onClick = {
-                onDelete(item.id) { ok ->
-                    showDeleteConfirm = false
-                    if (ok) onBack()
+        var deletingItem by remember { mutableStateOf(false) }
+        var deletingProgress by remember { mutableStateOf(0f) }
+        var deletingError by remember { mutableStateOf<String?>(null) }
+        AppDialog(onDismiss = { if (!deletingItem) { showDeleteConfirm = false } }, title = if (deletingItem) "正在删除商品" else "确认删除该商品？", content = {
+            if (deletingItem) {
+                LinearProgressIndicator(progress = deletingProgress, modifier = Modifier.fillMaxWidth())
+                Text(((deletingProgress * 100).toInt()).toString() + "%")
+                if (deletingError != null) {
+                    Text(deletingError!!, color = MaterialTheme.colorScheme.error)
                 }
-            }) { Text("删除") }
+            }
+        }, actions = {
+            androidx.compose.material3.TextButton(onClick = { showDeleteConfirm = false }, enabled = !deletingItem) { Text("取消") }
+            androidx.compose.material3.TextButton(onClick = {
+                deletingItem = true
+                deletingError = null
+                deletingProgress = 0.5f
+                onDelete(item.id) { ok ->
+                    deletingItem = false
+                    deletingProgress = 1f
+                    if (ok) {
+                        showDeleteConfirm = false
+                        onBack()
+                    } else {
+                        deletingError = "删除失败"
+                    }
+                }
+            }, enabled = !deletingItem) { Text("删除") }
         })
+    }
+
+    LaunchedEffect(uploadProgress, uploading) {
+        if (!uploading && uploadProgress >= 1f) {
+            showUploadDialog = false
+        }
+    }
+    LaunchedEffect(itemSaveProgress, savingItem) {
+        if (!savingItem && itemSaveProgress >= 1f) {
+            showItemSaveDialog = false
+        }
+    }
+    LaunchedEffect(saveProgress, saving) {
+        if (!saving && saveProgress >= 1f) {
+            showSaveDialog = false
+        }
     }
 }
 

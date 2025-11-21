@@ -79,7 +79,7 @@ fun HomeScreen(
     onItemClick: (CargoItem) -> Unit,
     favorites: Set<String>,
     onToggleFavorite: (String) -> Unit,
-    onAddItemWithImage: (CargoItem, Uri?) -> Unit,
+    onAddItemWithImages: (CargoItem, List<Uri>) -> Unit,
     columnsPerRow: Int,
     onRefresh: () -> Unit
 ) {
@@ -198,8 +198,8 @@ fun HomeScreen(
             var groupName by remember { mutableStateOf("") }
             var link by remember { mutableStateOf("") }
             var priceText by remember { mutableStateOf("") }
-            var imageUri by remember { mutableStateOf<Uri?>(null) }
-            val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> imageUri = uri }
+            var imageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+            val pickImages = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> imageUris = uris ?: emptyList() }
             val canSave = true
             AppDialog(onDismiss = { addOpen = false }, title = "新增商品", content = {
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") }, singleLine = true)
@@ -209,10 +209,10 @@ fun HomeScreen(
                 OutlinedTextField(value = priceText, onValueChange = { priceText = it }, label = { Text("售价") }, singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done))
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = { pickImage.launch("image/*") }) { Text("选择图片") }
-                    if (imageUri != null) {
+                    Button(onClick = { pickImages.launch("image/*") }) { Text("选择图片") }
+                    if (imageUris.isNotEmpty()) {
                         Spacer(Modifier.width(8.dp))
-                        Text("已选择", style = MaterialTheme.typography.bodyMedium)
+                        Text("已选择" + imageUris.size + "张", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }, actions = {
@@ -229,7 +229,7 @@ fun HomeScreen(
                         price = priceVal,
                         link = link
                     )
-                    onAddItemWithImage(item, imageUri)
+                    onAddItemWithImages(item, imageUris)
                     addOpen = false
                 }, enabled = canSave) { Text("保存") }
             })

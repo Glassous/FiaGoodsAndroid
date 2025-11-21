@@ -68,22 +68,22 @@ class GoodsViewModel : ViewModel() {
 
     fun clearAuthMessage() { _authInvalidMessage.value = null }
 
-    fun addItem(context: Context, item: CargoItem, onDone: (Boolean) -> Unit) {
+    fun addItem(context: Context, item: CargoItem, onDone: (Boolean, CargoItem?) -> Unit) {
         viewModelScope.launch {
-            if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
+            if (!SessionPrefs.isVerified(context)) { onDone(false, null); return@launch }
             try {
                 val created = withContext(Dispatchers.IO) { api.createCargoItem(item) }
                 if (created != null) {
                     _items.value = _items.value + created
                     _operationMessage.value = "新增商品成功"
-                    onDone(true)
+                    onDone(true, created)
                 } else {
                     _operationMessage.value = "新增商品失败"
-                    onDone(false)
+                    onDone(false, null)
                 }
             } catch (e: Exception) {
                 _operationMessage.value = "新增商品异常"
-                onDone(false)
+                onDone(false, null)
             }
         }
     }
@@ -163,6 +163,43 @@ class GoodsViewModel : ViewModel() {
                     _operationMessage.value = "图片上传失败"
                     onDone(false)
                 }
+            } catch (e: Exception) {
+                _operationMessage.value = "图片上传异常"
+                onDone(false)
+            }
+        }
+    }
+
+    fun addImages(context: Context, id: String, uris: List<Uri>, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
+            var item = findById(id) ?: run { onDone(false); return@launch }
+            if (!hasOssConfig(context)) {
+                _operationMessage.value = "OSS 配置缺失"
+                onDone(false)
+                return@launch
+            }
+            try {
+                val oss = OssApi(context)
+                for (uri in uris) {
+                    val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+                    val ext = when (mime.lowercase()) {
+                        "image/png" -> "png"
+                        "image/webp" -> "webp"
+                        else -> "jpg"
+                    }
+                    val fileName = System.currentTimeMillis().toString() + "." + ext
+                    val key = oss.buildKey("cargo/$id", fileName)
+                    val url = withContext(Dispatchers.IO) { oss.uploadUri(key, uri) }
+                    if (url == null) { _operationMessage.value = "图片上传失败"; onDone(false); return@launch }
+                    val newList = item.imageUrls + url
+                    val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, mapOf("image_urls" to newList)) }
+                    if (updated == null) { _operationMessage.value = "图片保存失败"; onDone(false); return@launch }
+                    _items.value = _items.value.map { if (it.id == id) updated else it }
+                    item = updated
+                }
+                _operationMessage.value = "图片上传成功"
+                onDone(true)
             } catch (e: Exception) {
                 _operationMessage.value = "图片上传异常"
                 onDone(false)

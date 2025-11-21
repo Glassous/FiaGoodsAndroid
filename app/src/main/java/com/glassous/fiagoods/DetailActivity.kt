@@ -89,8 +89,8 @@ class DetailActivity : ComponentActivity() {
                         DetailScreen(
                             item = item,
                             onBack = { finish() },
-                            onSave = { targetId, patch -> vm.updateItem(this@DetailActivity, targetId, patch) { ok -> if (ok) sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } },
-                            onDelete = { targetId, cb -> vm.deleteItem(this@DetailActivity, targetId) { ok -> cb(ok); if (ok) finish() } },
+                            onSave = { targetId, patch, done -> vm.updateItem(this@DetailActivity, targetId, patch) { ok -> done(ok); if (ok) sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } },
+                            onDelete = { targetId, cb -> vm.deleteItem(this@DetailActivity, targetId) { ok -> cb(ok); if (ok) { sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")); finish() } } },
                             onAddImage = { uri -> vm.addImage(this@DetailActivity, item.id, uri) { } },
                             onDeleteImage = { url -> vm.deleteImage(this@DetailActivity, item.id, url) { } },
                             onAddImageWithProgress = { uri, onProgress, onDone -> vm.addImageWithProgress(this@DetailActivity, item.id, uri, onProgress, onDone) },
