@@ -134,12 +134,25 @@ class MainActivity : ComponentActivity() {
                                 startActivity(android.content.Intent(this@MainActivity, DetailActivity::class.java).putExtra("id", item.id).putExtra("item", json))
                             }, favorites = favorites, onToggleFavorite = { id ->
                                 vm.toggleFavorite(this@MainActivity, id) { }
-                            }, onAddItemWithImages = { item, uris ->
+                            }, onCreateItemWithImages = { item, uris, onProgress, onDone ->
                                 vm.addItem(this@MainActivity, item) { ok, created ->
-                                    if (ok) {
-                                        val targetId = (created?.id) ?: item.id
-                                        vm.addImages(this@MainActivity, targetId, uris) { }
+                                    if (!ok) { onDone(false); return@addItem }
+                                    val targetId = (created?.id) ?: item.id
+                                    val total = uris.size
+                                    if (total == 0) { onDone(true); return@addItem }
+                                    var uploaded = 0
+                                    fun uploadNext() {
+                                        val u = uris[uploaded]
+                                        vm.addImage(this@MainActivity, targetId, u) { ok2 ->
+                                            if (!ok2) { onDone(false) } else {
+                                                uploaded++
+                                                onProgress(uploaded, total)
+                                                if (uploaded >= total) { onDone(true) } else { uploadNext() }
+                                            }
+                                        }
                                     }
+                                    onProgress(0, total)
+                                    uploadNext()
                                 }
                             }, columnsPerRow = cardDensity, onRefresh = { vm.refresh(this@MainActivity, clearBeforeLoad = true) })
                         }

@@ -159,14 +159,14 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     IconButton(onClick = { editing = true }) { Icon(Icons.Filled.Edit, contentDescription = null) }
                 } else {
                     IconButton(onClick = { editing = false }) { Icon(Icons.Filled.Close, contentDescription = null) }
-                    val canSave = description.isNotBlank() && category.isNotBlank() && priceText.toDoubleOrNull() != null
                     IconButton(onClick = {
                         val patch = mutableMapOf<String, Any?>()
-                        patch["description"] = description
-                        patch["category"] = category
-                        patch["group_name"] = groupName
-                        patch["link"] = link
-                        patch["price"] = priceText.toDoubleOrNull()
+                        if (description != item.description) patch["description"] = description
+                        if (category != item.category) patch["category"] = category
+                        if (groupName != item.groupName) patch["group_name"] = groupName
+                        if (link != item.link) patch["link"] = link
+                        val priceVal = priceText.toDoubleOrNull()
+                        if (priceVal != null && priceVal != item.price) patch["price"] = priceVal
                         showItemSaveDialog = true
                         savingItem = true
                         itemSaveProgress = 0f
@@ -179,7 +179,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                             }
                         }
                         editing = false
-                    }, enabled = canSave) { Icon(Icons.Filled.Save, contentDescription = null) }
+                    }) { Icon(Icons.Filled.Save, contentDescription = null) }
                 }
             }
         )
@@ -201,7 +201,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                             model = url,
                             contentDescription = null,
                             contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize().clickable { previewUrl = url }
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).clickable { previewUrl = url }
                         )
                         if (editing) {
                             Row(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp), horizontalArrangement = Arrangement.End) {
@@ -243,7 +243,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     HorizontalMultiBrowseCarousel(
                         state = state,
                         preferredItemWidth = 220.dp,
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp).clip(RoundedCornerShape(16.dp)),
                         itemSpacing = 8.dp,
                         flingBehavior = CarouselDefaults.singleAdvanceFlingBehavior(state)
                     ) { itemIndex: Int ->
@@ -253,7 +253,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                                 model = url,
                                 contentDescription = null,
                                 contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize().clickable { previewUrl = url }
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).clickable { previewUrl = url }
                             )
                             if (editing) {
                                 Row(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp), horizontalArrangement = Arrangement.End) {

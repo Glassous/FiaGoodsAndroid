@@ -79,7 +79,7 @@ fun HomeScreen(
     onItemClick: (CargoItem) -> Unit,
     favorites: Set<String>,
     onToggleFavorite: (String) -> Unit,
-    onAddItemWithImages: (CargoItem, List<Uri>) -> Unit,
+    onCreateItemWithImages: (CargoItem, List<Uri>, (Int, Int) -> Unit, (Boolean) -> Unit) -> Unit,
     columnsPerRow: Int,
     onRefresh: () -> Unit
 ) {
@@ -90,22 +90,29 @@ fun HomeScreen(
     var selectedGroups by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedCategories by remember { mutableStateOf<Set<String>>(emptySet()) }
     var addOpen by remember { mutableStateOf(false) }
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var creating by remember { mutableStateOf(false) }
+    var createProgress by remember { mutableStateOf(0f) }
+    var createMessage by remember { mutableStateOf("") }
+    var createError by remember { mutableStateOf<String?>(null) }
     Column(modifier = if (addOpen || filterOpen) Modifier.fillMaxSize().blur(12.dp) else Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("FiaGoods") },
             actions = {
-                IconButton(onClick = onRefresh) {
-                    Icon(imageVector = Icons.Filled.Refresh, contentDescription = null)
-                }
-                IconButton(onClick = { favoritesOnly = !favoritesOnly }) {
-                    val tint = if (favoritesOnly) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface
-                    Icon(imageVector = Icons.Filled.Star, contentDescription = null, tint = tint)
-                }
-                IconButton(onClick = { filterOpen = true }) {
-                    Icon(Icons.Filled.FilterList, contentDescription = null)
-                }
-                IconButton(onClick = { addOpen = true }) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
+                if (!loading) {
+                    IconButton(onClick = onRefresh) {
+                        Icon(imageVector = Icons.Filled.Refresh, contentDescription = null)
+                    }
+                    IconButton(onClick = { favoritesOnly = !favoritesOnly }) {
+                        val tint = if (favoritesOnly) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface
+                        Icon(imageVector = Icons.Filled.Star, contentDescription = null, tint = tint)
+                    }
+                    IconButton(onClick = { filterOpen = true }) {
+                        Icon(Icons.Filled.FilterList, contentDescription = null)
+                    }
+                    IconButton(onClick = { addOpen = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                    }
                 }
                 val context = LocalContext.current
                 IconButton(onClick = {
@@ -229,10 +236,46 @@ fun HomeScreen(
                         price = priceVal,
                         link = link
                     )
-                    onAddItemWithImages(item, imageUris)
+                    showCreateDialog = true
+                    creating = true
+                    createProgress = 0f
+                    createMessage = "正在创建商品数据…"
+                    createError = null
+                    onCreateItemWithImages(item, imageUris, { done, total ->
+                        val t = total.coerceAtLeast(1)
+                        createProgress = done.toFloat() / t.toFloat()
+                        createMessage = "已上传第" + done + "/" + total + "张"
+                    }, { ok ->
+                        creating = false
+                        createProgress = 1f
+                        if (!ok) {
+                            createError = "创建或上传失败"
+                        }
+                    })
                     addOpen = false
                 }, enabled = canSave) { Text("保存") }
             })
+        }
+
+        if (showCreateDialog) {
+            AppDialog(onDismiss = { if (!creating) { showCreateDialog = false } }, title = "新增商品", content = {
+                androidx.compose.material3.LinearProgressIndicator(progress = createProgress, modifier = Modifier.fillMaxWidth())
+                Text(((createProgress * 100).toInt()).toString() + "%")
+                if (createMessage.isNotBlank()) {
+                    Text(createMessage, style = MaterialTheme.typography.bodyMedium)
+                }
+                if (createError != null) {
+                    Text(createError!!, color = MaterialTheme.colorScheme.error)
+                }
+            }, actions = {
+                androidx.compose.material3.TextButton(onClick = { showCreateDialog = false }, enabled = !creating) { Text("关闭") }
+            })
+        }
+
+        androidx.compose.runtime.LaunchedEffect(createProgress, creating) {
+            if (!creating && createProgress >= 1f) {
+                showCreateDialog = false
+            }
         }
 
         if (filterOpen) {
