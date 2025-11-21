@@ -42,6 +42,9 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.glassous.fiagoods.data.SessionPrefs
 import com.glassous.fiagoods.ui.theme.FiaGoodsTheme
+import com.glassous.fiagoods.data.model.CargoItem
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,9 +69,17 @@ class SettingsActivity : ComponentActivity() {
                 },
                 dynamicColor = true
             ) {
+                val itemCount = remember {
+                    val json = SessionPrefs.getItemsCache(this)
+                    if (json.isNullOrBlank()) 0 else try {
+                        val type = object : TypeToken<List<CargoItem>>() {}.type
+                        Gson().fromJson<List<CargoItem>>(json, type)?.size ?: 0
+                    } catch (e: Exception) { 0 }
+                }
                 SettingsScreen(
                     mode = mode,
                     density = density,
+                    itemCount = itemCount,
                     onBack = { finish() },
                     onModeChange = {
                         mode = it
@@ -86,7 +97,7 @@ class SettingsActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScreen(mode: String, density: Int, onBack: () -> Unit, onModeChange: (String) -> Unit, onDensityChange: (Int) -> Unit) {
+private fun SettingsScreen(mode: String, density: Int, itemCount: Int, onBack: () -> Unit, onModeChange: (String) -> Unit, onDensityChange: (Int) -> Unit) {
     Scaffold(modifier = Modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0)) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             TopAppBar(
@@ -121,6 +132,12 @@ private fun SettingsScreen(mode: String, density: Int, onBack: () -> Unit, onMod
                             Text(density.toString(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                             Button(onClick = { onDensityChange((density + 1).coerceAtMost(10)) }, modifier = Modifier.weight(1f)) { Text("+") }
                         }
+                    }
+                }
+                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("商品总数", style = MaterialTheme.typography.titleMedium)
+                        Text(itemCount.toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
