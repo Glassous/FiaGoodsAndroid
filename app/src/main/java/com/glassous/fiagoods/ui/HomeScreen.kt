@@ -97,6 +97,8 @@ fun HomeScreen(
     var favoritesOnly by remember { mutableStateOf(false) }
     var selectedGroups by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedCategories by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var includeUngrouped by remember { mutableStateOf(false) }
+    var includeUncategorized by remember { mutableStateOf(false) }
     var addOpen by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var creating by remember { mutableStateOf(false) }
@@ -144,9 +146,17 @@ fun HomeScreen(
             } else {
                 val base = if (query.isBlank()) items else items.filter { it.description.contains(query, true) || it.category.contains(query, true) }
                 val list = base.filter {
-                    (selectedGroups.isEmpty() || selectedGroups.contains(it.groupName)) &&
-                    (selectedCategories.isEmpty() || selectedCategories.contains(it.category)) &&
-                    (!favoritesOnly || favorites.contains(it.id))
+                    val groupMatch = if (selectedGroups.isEmpty() && !includeUngrouped) {
+                        true
+                    } else {
+                        selectedGroups.contains(it.groupName) || (includeUngrouped && it.groupName.isBlank())
+                    }
+                    val categoryMatch = if (selectedCategories.isEmpty() && !includeUncategorized) {
+                        true
+                    } else {
+                        selectedCategories.contains(it.category) || (includeUncategorized && it.category.isBlank())
+                    }
+                    groupMatch && categoryMatch && (!favoritesOnly || favorites.contains(it.id))
                 }
                 val ctx = LocalContext.current
                 val clipboard = LocalClipboardManager.current
@@ -383,6 +393,11 @@ fun HomeScreen(
                     if (groupExpanded) {
                         OutlinedTextField(value = groupQuery, onValueChange = { groupQuery = it }, label = { Text("搜索分组") }, singleLine = true, shape = RoundedCornerShape(20.dp))
                         Spacer(Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = includeUngrouped, onCheckedChange = { includeUngrouped = it })
+                            Text("未分组", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Spacer(Modifier.height(6.dp))
                         filteredGroups.forEach { g ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(checked = selectedGroups.contains(g), onCheckedChange = {
@@ -404,6 +419,11 @@ fun HomeScreen(
                     if (categoryExpanded) {
                         OutlinedTextField(value = categoryQuery, onValueChange = { categoryQuery = it }, label = { Text("搜索类别") }, singleLine = true, shape = RoundedCornerShape(20.dp))
                         Spacer(Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = includeUncategorized, onCheckedChange = { includeUncategorized = it })
+                            Text("未分类", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Spacer(Modifier.height(6.dp))
                         filteredCategories.forEach { c ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(checked = selectedCategories.contains(c), onCheckedChange = {
@@ -418,6 +438,8 @@ fun HomeScreen(
                 androidx.compose.material3.TextButton(onClick = {
                     selectedGroups = emptySet()
                     selectedCategories = emptySet()
+                    includeUngrouped = false
+                    includeUncategorized = false
                 }) { Text("清空") }
                 androidx.compose.material3.TextButton(onClick = { filterOpen = false }) { Text("确定") }
             })
