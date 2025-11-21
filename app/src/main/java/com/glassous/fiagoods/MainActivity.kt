@@ -50,6 +50,7 @@ import android.content.Context
 import coil.ImageLoader
 import coil.compose.LocalImageLoader
 import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import okhttp3.Cache
 import okhttp3.OkHttpClient
 
@@ -66,12 +67,19 @@ class MainActivity : ComponentActivity() {
         flags = flags or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
         window.decorView.systemUiVisibility = flags
         val imageLoader = ImageLoader.Builder(this)
+            .memoryCache(
+                MemoryCache.Builder(this)
+                    .maxSizePercent(0.30)
+                    .strongReferencesEnabled(true)
+                    .build()
+            )
             .diskCache(
                 DiskCache.Builder()
                     .directory(java.io.File(cacheDir, "image_cache"))
                     .maxSizeBytes(200L * 1024 * 1024)
                     .build()
             )
+            .respectCacheHeaders(false)
             .okHttpClient {
                 OkHttpClient.Builder()
                     .cache(Cache(java.io.File(cacheDir, "okhttp-cache"), 50L * 1024 * 1024))
@@ -123,6 +131,7 @@ class MainActivity : ComponentActivity() {
                         composable("home") {
                             val items by vm.items.collectAsState()
                             val loading by vm.loading.collectAsState()
+                            LaunchedEffect(Unit) { vm.loadCache(this@MainActivity) }
                             LaunchedEffect(Unit) { vm.refresh(this@MainActivity) }
                             DisposableEffect(Unit) {
                                 val receiver = object : BroadcastReceiver() {

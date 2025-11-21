@@ -15,9 +15,12 @@ import java.util.UUID
 import android.net.Uri
 import com.glassous.fiagoods.data.OssApi
 import com.glassous.fiagoods.BuildConfig
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 class GoodsViewModel : ViewModel() {
     private val api = SupabaseApi()
+    private val gson = Gson()
     private val _items = MutableStateFlow<List<CargoItem>>(emptyList())
     val items: StateFlow<List<CargoItem>> = _items
     private val _loading = MutableStateFlow(false)
@@ -60,6 +63,10 @@ class GoodsViewModel : ViewModel() {
             val res = withContext(Dispatchers.IO) { api.fetchCargoItems() }
             _items.value = res
             _favorites.value = res.filter { it.isFavorite }.map { it.id }.toSet()
+            try {
+                val json = gson.toJson(res)
+                SessionPrefs.setItemsCache(context, json)
+            } catch (_: Exception) { }
             _loading.value = false
         }
     }
@@ -387,5 +394,18 @@ class GoodsViewModel : ViewModel() {
         val s = SessionPrefs.getOssAccessKeySecret(context) ?: BuildConfig.OSS_ACCESS_KEY_SECRET
         val u = SessionPrefs.getOssPublicBaseUrl(context) ?: BuildConfig.OSS_PUBLIC_BASE_URL
         return listOf(e, b, id, s, u).all { it.isNotBlank() }
+    }
+    fun loadCache(context: Context) {
+        val json = SessionPrefs.getItemsCache(context)
+        if (!json.isNullOrBlank()) {
+            try {
+                val type = object : TypeToken<List<CargoItem>>() {}.type
+                val list = gson.fromJson<List<CargoItem>>(json, type) ?: emptyList()
+                if (list.isNotEmpty()) {
+                    _items.value = list
+                    _favorites.value = list.filter { it.isFavorite }.map { it.id }.toSet()
+                }
+            } catch (_: Exception) { }
+        }
     }
 }

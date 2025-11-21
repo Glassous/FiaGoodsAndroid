@@ -60,6 +60,7 @@ class DetailActivity : ComponentActivity() {
                 LaunchedEffect(parsed) {
                     if (parsed != null) {
                         vm.seedItems(listOf(parsed))
+                        vm.refresh(this@DetailActivity)
                     } else {
                         vm.refresh(this@DetailActivity)
                     }

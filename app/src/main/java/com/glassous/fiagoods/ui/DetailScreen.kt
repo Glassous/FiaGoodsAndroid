@@ -390,11 +390,10 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
             } else {
                 item {
                     var categoryExpanded by remember { mutableStateOf(false) }
-                    val filteredCategories = remember(categoryOptions, category) { if (category.isBlank()) categoryOptions else categoryOptions.filter { it.contains(category, true) } }
                     Box {
                         OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), trailingIcon = { IconButton(onClick = { categoryExpanded = !categoryExpanded }) { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) } })
                         DropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }) {
-                            filteredCategories.forEach { c ->
+                            categoryOptions.forEach { c ->
                                 DropdownMenuItem(text = { Text(c) }, onClick = { category = c; categoryExpanded = false })
                             }
                         }
@@ -402,11 +401,10 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 }
                 item {
                     var groupExpanded by remember { mutableStateOf(false) }
-                    val filteredGroups = remember(groupOptions, groupName) { if (groupName.isBlank()) groupOptions else groupOptions.filter { it.contains(groupName, true) } }
                     Box {
                         OutlinedTextField(value = groupName, onValueChange = { groupName = it }, label = { Text("分组") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), trailingIcon = { IconButton(onClick = { groupExpanded = !groupExpanded }) { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) } })
                         DropdownMenu(expanded = groupExpanded, onDismissRequest = { groupExpanded = false }) {
-                            filteredGroups.forEach { g ->
+                            groupOptions.forEach { g ->
                                 DropdownMenuItem(text = { Text(g) }, onClick = { groupName = g; groupExpanded = false })
                             }
                         }

@@ -69,6 +69,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import android.widget.Toast
 import coil.request.ImageRequest
+import coil.request.CachePolicy
+import coil.compose.LocalImageLoader
 import com.glassous.fiagoods.util.buildOssThumbnailUrl
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -148,6 +150,26 @@ fun HomeScreen(
                 }
                 val ctx = LocalContext.current
                 val clipboard = LocalClipboardManager.current
+                val imageLoader = LocalImageLoader.current
+                val conf = LocalConfiguration.current
+                androidx.compose.runtime.LaunchedEffect(list) {
+                    val widthPx = (conf.screenWidthDp * ctx.resources.displayMetrics.density).toInt()
+                    val heightPx = (widthPx * 9 / 16)
+                    val prefetch = list.take(100).mapNotNull { it.imageUrls.firstOrNull() }
+                    prefetch.forEach { u ->
+                        val t = buildOssThumbnailUrl(u, widthPx)
+                        val req = ImageRequest.Builder(ctx)
+                            .data(t)
+                            .size(widthPx, heightPx)
+                            .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                            .memoryCacheKey(u)
+                            .diskCacheKey(t)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .build()
+                        imageLoader.enqueue(req)
+                    }
+                }
                 Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
                     OutlinedTextField(
                         value = query,
@@ -167,13 +189,14 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalItemSpacing = 8.dp
                     ) {
-                        items(list) { item ->
+                        items(list, key = { it.id }) { item ->
                             Card(elevation = CardDefaults.cardElevation(), modifier = Modifier.fillMaxWidth().combinedClickable(onClick = { onItemClick(item) }, onLongClick = {
                                 clipboard.setText(AnnotatedString(item.link))
                                 Toast.makeText(ctx, "链接已复制", Toast.LENGTH_SHORT).show()
                             })) {
                                 Column {
-                                    val previewUrl = item.imageUrls.firstOrNull()
+                                    var previewIndex by remember(item.id) { mutableStateOf(0) }
+                                    val previewUrl = item.imageUrls.getOrNull(previewIndex)
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -182,13 +205,29 @@ fun HomeScreen(
                                         val conf = LocalConfiguration.current
                                         val widthPx = (conf.screenWidthDp * ctx.resources.displayMetrics.density).toInt()
                                         val thumbUrl = previewUrl?.let { buildOssThumbnailUrl(it, widthPx) }
-                                        val request = ImageRequest.Builder(ctx)
-                                            .data(thumbUrl)
-                                            .size(widthPx, (widthPx * 9 / 16))
-                                            .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
-                                            .crossfade(true)
-                                            .build()
-                                        AsyncImage(model = request, contentDescription = null, contentScale = ContentScale.FillWidth, modifier = Modifier.fillMaxWidth())
+                                        val request = remember(thumbUrl) {
+                                            ImageRequest.Builder(ctx)
+                                                .data(thumbUrl)
+                                                .size(widthPx, (widthPx * 9 / 16))
+                                                .bitmapConfig(android.graphics.Bitmap.Config.RGB_565)
+                                                .memoryCacheKey(previewUrl)
+                                                .diskCacheKey(thumbUrl ?: previewUrl)
+                                                .diskCachePolicy(CachePolicy.ENABLED)
+                                                .memoryCachePolicy(CachePolicy.ENABLED)
+                                                .crossfade(false)
+                                                .build()
+                                        }
+                                        AsyncImage(
+                                            model = request,
+                                            contentDescription = null,
+                                            contentScale = ContentScale.FillWidth,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            onError = {
+                                                if (previewIndex < item.imageUrls.size - 1) {
+                                                    previewIndex++
+                                                }
+                                            }
+                                        )
                                         val tint = if (favorites.contains(item.id)) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface
                                         Box(
                                             modifier = Modifier

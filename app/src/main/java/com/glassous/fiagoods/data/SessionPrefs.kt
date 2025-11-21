@@ -16,6 +16,7 @@ object SessionPrefs {
     private const val KEY_OSS_ACCESS_KEY_ID = "oss_access_key_id"
     private const val KEY_OSS_ACCESS_KEY_SECRET = "oss_access_key_secret"
     private const val KEY_OSS_PUBLIC_BASE_URL = "oss_public_base_url"
+    private const val KEY_ITEMS_CACHE_JSON = "items_cache_json"
 
     private fun prefs(context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
@@ -74,4 +75,10 @@ object SessionPrefs {
         if (publicBaseUrl != null) editor.putString(KEY_OSS_PUBLIC_BASE_URL, publicBaseUrl)
         editor.apply()
     }
+
+    fun setItemsCache(context: Context, json: String) {
+        prefs(context).edit().putString(KEY_ITEMS_CACHE_JSON, json).apply()
+    }
+
+    fun getItemsCache(context: Context): String? = prefs(context).getString(KEY_ITEMS_CACHE_JSON, null)
 }
