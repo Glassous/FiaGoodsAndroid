@@ -19,6 +19,8 @@ val OSS_BUCKET: String = envLocal.getProperty("OSS_BUCKET", "")
 val OSS_ACCESS_KEY_ID: String = envLocal.getProperty("OSS_ACCESS_KEY_ID", "")
 val OSS_ACCESS_KEY_SECRET: String = envLocal.getProperty("OSS_ACCESS_KEY_SECRET", "")
 val OSS_PUBLIC_BASE_URL: String = envLocal.getProperty("OSS_PUBLIC_BASE_URL", "")
+val APP_VERSION_JSON_URL: String = envLocal.getProperty("APP_VERSION_JSON_URL", "")
+val APP_DOWNLOAD_BASE_URL: String = envLocal.getProperty("APP_DOWNLOAD_BASE_URL", "")
 
 android {
     namespace = "com.glassous.fiagoods"
@@ -42,6 +44,8 @@ android {
         buildConfigField("String", "OSS_ACCESS_KEY_ID", "\"$OSS_ACCESS_KEY_ID\"")
         buildConfigField("String", "OSS_ACCESS_KEY_SECRET", "\"$OSS_ACCESS_KEY_SECRET\"")
         buildConfigField("String", "OSS_PUBLIC_BASE_URL", "\"$OSS_PUBLIC_BASE_URL\"")
+        buildConfigField("String", "APP_VERSION_JSON_URL", "\"$APP_VERSION_JSON_URL\"")
+        buildConfigField("String", "APP_DOWNLOAD_BASE_URL", "\"$APP_DOWNLOAD_BASE_URL\"")
     }
 
     buildTypes {

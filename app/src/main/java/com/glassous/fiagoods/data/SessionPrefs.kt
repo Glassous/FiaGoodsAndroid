@@ -17,6 +17,7 @@ object SessionPrefs {
     private const val KEY_OSS_ACCESS_KEY_SECRET = "oss_access_key_secret"
     private const val KEY_OSS_PUBLIC_BASE_URL = "oss_public_base_url"
     private const val KEY_ITEMS_CACHE_JSON = "items_cache_json"
+    private const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
 
     private fun prefs(context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
@@ -81,4 +82,9 @@ object SessionPrefs {
     }
 
     fun getItemsCache(context: Context): String? = prefs(context).getString(KEY_ITEMS_CACHE_JSON, null)
+
+    fun isAutoUpdateEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_AUTO_UPDATE_CHECK, true)
+    fun setAutoUpdateEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_AUTO_UPDATE_CHECK, enabled).apply()
+    }
 }

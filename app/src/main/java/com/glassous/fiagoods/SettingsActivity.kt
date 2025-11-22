@@ -26,7 +26,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,7 +47,14 @@ import androidx.compose.foundation.layout.width
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import com.glassous.fiagoods.data.SessionPrefs
+import com.glassous.fiagoods.data.UpdateApi
+import com.glassous.fiagoods.BuildConfig
 import com.glassous.fiagoods.ui.theme.FiaGoodsTheme
 import com.glassous.fiagoods.data.model.CargoItem
 import com.google.gson.Gson
@@ -98,7 +112,8 @@ class SettingsActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsScreen(mode: String, density: Int, itemCount: Int, onBack: () -> Unit, onModeChange: (String) -> Unit, onDensityChange: (Int) -> Unit) {
-    Scaffold(modifier = Modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0)) { innerPadding ->
+    val snackbarHostState = remember { SnackbarHostState() }
+    Scaffold(modifier = Modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0), snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             TopAppBar(
                 title = { Text("设置") },
@@ -131,6 +146,118 @@ private fun SettingsScreen(mode: String, density: Int, itemCount: Int, onBack: (
                             Button(onClick = { onDensityChange((density - 1).coerceAtLeast(0)) }, modifier = Modifier.weight(1f)) { Text("-") }
                             Text(density.toString(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                             Button(onClick = { onDensityChange((density + 1).coerceAtMost(10)) }, modifier = Modifier.weight(1f)) { Text("+") }
+                        }
+                    }
+                }
+                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
+                    val ctx = LocalContext.current
+                    val scope = rememberCoroutineScope()
+                    var checking by remember { mutableStateOf(false) }
+                    var latest by remember { mutableStateOf<UpdateApi.VersionInfo?>(null) }
+                    var error by remember { mutableStateOf<String?>(null) }
+                    var errorDetail by remember { mutableStateOf<String?>(null) }
+                    val api = remember { UpdateApi() }
+                    var showUpdateDialog by remember { mutableStateOf(false) }
+                    var showNoUpdateDialog by remember { mutableStateOf(false) }
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("版本更新", style = MaterialTheme.typography.titleMedium)
+                        Text("当前版本：" + BuildConfig.VERSION_NAME, style = MaterialTheme.typography.bodyMedium)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = {
+                                val blank = BuildConfig.APP_VERSION_JSON_URL.trim().isBlank()
+                                if (blank) {
+                                    error = "APP_VERSION_JSON_URL is blank"
+                                    scope.launch { snackbarHostState.showSnackbar(error!!) }
+                                } else {
+                                    scope.launch {
+                                        checking = true
+                                        error = null
+                                        errorDetail = null
+                                        latest = null
+                                        val result = api.fetchLatestVersionInfoVerbose()
+                                        checking = false
+                                        if (result.error != null) {
+                                            error = result.error
+                                            val code = result.httpCode?.toString() ?: ""
+                                            val body = result.bodyPreview ?: ""
+                                            val u = result.url
+                                            val detail = listOf(
+                                                if (code.isNotBlank()) "HTTP Code: " + code else "",
+                                                if (u.isNotBlank()) "URL: " + u else "",
+                                                if (body.isNotBlank()) "Body preview: " + body else ""
+                                            ).filter { it.isNotBlank() }.joinToString("\n")
+                                            errorDetail = if (detail.isNotBlank()) detail else null
+                                            snackbarHostState.showSnackbar(result.error!!)
+                                        } else {
+                                            latest = result.info
+                                            val hasUpdate = result.info?.versionCode?.let { it > BuildConfig.VERSION_CODE } ?: false
+                                            if (hasUpdate) {
+                                                showUpdateDialog = true
+                                            } else {
+                                                showNoUpdateDialog = true
+                                            }
+                                        }
+                                    }
+                                }
+                            }, modifier = Modifier.weight(1f)) { Text("检查更新") }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("自动检查更新", style = MaterialTheme.typography.bodyMedium)
+                            var autoCheck by remember { mutableStateOf(SessionPrefs.isAutoUpdateEnabled(ctx)) }
+                            Switch(checked = autoCheck, onCheckedChange = {
+                                autoCheck = it
+                                SessionPrefs.setAutoUpdateEnabled(ctx, it)
+                            })
+                        }
+                        if (checking) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+                        if (error != null) {
+                            Text(error!!, color = MaterialTheme.colorScheme.error)
+                            if (errorDetail != null) {
+                                Text(errorDetail!!, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        if (showUpdateDialog && latest != null) {
+                            val l = latest!!
+                            AlertDialog(
+                                onDismissRequest = { showUpdateDialog = false },
+                                title = { Text("有新版本：" + l.versionName) },
+                                text = {
+                                    val notes = l.releaseNotes ?: emptyList()
+                                    val content = if (notes.isNotEmpty()) notes.joinToString("\n") else ""
+                                    Text(content)
+                                },
+                                confirmButton = {
+                                    TextButton(onClick = {
+                                        val baseBlank = BuildConfig.APP_DOWNLOAD_BASE_URL.trim().isBlank()
+                                        if (baseBlank) {
+                                            error = "未配置下载基地址"
+                                            scope.launch { snackbarHostState.showSnackbar(error!!) }
+                                        } else {
+                                            try {
+                                                val url = api.buildApkDownloadUrl(l)
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                                ctx.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                error = "无法打开下载链接"
+                                                scope.launch { snackbarHostState.showSnackbar(error!!) }
+                                            }
+                                        }
+                                    }) { Text("下载") }
+                                },
+                                dismissButton = { TextButton(onClick = { showUpdateDialog = false }) { Text("取消") } }
+                            )
+                        }
+                        if (showNoUpdateDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showNoUpdateDialog = false },
+                                title = { Text("当前已是最新版本") },
+                                text = {},
+                                confirmButton = {
+                                    TextButton(onClick = { showNoUpdateDialog = false }) { Text("确定") }
+                                }
+                            )
                         }
                     }
                 }
