@@ -61,10 +61,11 @@ class GoodsViewModel : ViewModel() {
                 ossCfg["oss_public_base_url"]
             )
             val res = withContext(Dispatchers.IO) { api.fetchCargoItems() }
-            _items.value = res
-            _favorites.value = res.filter { it.isFavorite }.map { it.id }.toSet()
+            val fixed = res.map { it.copy(groupNames = it.groupNames ?: emptyList(), categories = it.categories ?: emptyList()) }
+            _items.value = fixed
+            _favorites.value = fixed.filter { it.isFavorite }.map { it.id }.toSet()
             try {
-                val json = gson.toJson(res)
+                val json = gson.toJson(fixed)
                 SessionPrefs.setItemsCache(context, json)
             } catch (_: Exception) { }
             _loading.value = false
@@ -383,8 +384,9 @@ class GoodsViewModel : ViewModel() {
     }
 
     fun seedItems(items: List<CargoItem>) {
-        _items.value = items
-        _favorites.value = items.filter { it.isFavorite }.map { it.id }.toSet()
+        val fixed = items.map { it.copy(groupNames = it.groupNames ?: emptyList(), categories = it.categories ?: emptyList()) }
+        _items.value = fixed
+        _favorites.value = fixed.filter { it.isFavorite }.map { it.id }.toSet()
     }
 
     private fun hasOssConfig(context: Context): Boolean {
@@ -401,9 +403,10 @@ class GoodsViewModel : ViewModel() {
             try {
                 val type = object : TypeToken<List<CargoItem>>() {}.type
                 val list = gson.fromJson<List<CargoItem>>(json, type) ?: emptyList()
-                if (list.isNotEmpty()) {
-                    _items.value = list
-                    _favorites.value = list.filter { it.isFavorite }.map { it.id }.toSet()
+                val fixed = list.map { it.copy(groupNames = it.groupNames ?: emptyList(), categories = it.categories ?: emptyList()) }
+                if (fixed.isNotEmpty()) {
+                    _items.value = fixed
+                    _favorites.value = fixed.filter { it.isFavorite }.map { it.id }.toSet()
                 }
             } catch (_: Exception) { }
         }

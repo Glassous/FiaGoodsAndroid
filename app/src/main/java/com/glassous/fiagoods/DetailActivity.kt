@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -86,20 +87,22 @@ class DetailActivity : ComponentActivity() {
                 }
 
                 Scaffold(modifier = Modifier.fillMaxSize(), snackbarHost = { SnackbarHost(snackbarHostState) }, contentWindowInsets = WindowInsets(0)) { innerPadding ->
-                    if (item != null) {
-                        DetailScreen(
-                            item = item,
-                            onBack = { finish() },
-                            onSave = { targetId, patch, done -> vm.updateItem(this@DetailActivity, targetId, patch) { ok -> done(ok); if (ok) sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } },
-                            onDelete = { targetId, cb -> vm.deleteItem(this@DetailActivity, targetId) { ok -> cb(ok); if (ok) { sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")); finish() } } },
-                            onAddImage = { uri -> vm.addImage(this@DetailActivity, item.id, uri) { } },
-                            onDeleteImage = { url -> vm.deleteImage(this@DetailActivity, item.id, url) { } },
-                            onAddImageWithProgress = { uri, onProgress, onDone -> vm.addImageWithProgress(this@DetailActivity, item.id, uri, onProgress, onDone) },
-                            onDeleteImageWithProgress = { url, onProgress, onDone -> vm.deleteImageWithProgress(this@DetailActivity, item.id, url, onProgress, onDone) },
-                            onAddImageUrlsDirect = { urls, done -> vm.addImageUrlsDirect(this@DetailActivity, item.id, urls) { ok -> done(ok) } },
-                            groupOptions = items.map { it.groupName }.filter { it.isNotBlank() }.distinct().sorted(),
-                            categoryOptions = items.map { it.category }.filter { it.isNotBlank() }.distinct().sorted()
-                        )
+                    Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+                        if (item != null) {
+                            DetailScreen(
+                                item = item,
+                                onBack = { finish() },
+                                onSave = { targetId, patch, done -> vm.updateItem(this@DetailActivity, targetId, patch) { ok -> done(ok); if (ok) sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH").setPackage(BuildConfig.APPLICATION_ID)) } },
+                                onDelete = { targetId, cb -> vm.deleteItem(this@DetailActivity, targetId) { ok -> cb(ok); if (ok) { sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH").setPackage(BuildConfig.APPLICATION_ID)); finish() } } },
+                                onAddImage = { uri -> vm.addImage(this@DetailActivity, item.id, uri) { } },
+                                onDeleteImage = { url -> vm.deleteImage(this@DetailActivity, item.id, url) { } },
+                                onAddImageWithProgress = { uri, onProgress, onDone -> vm.addImageWithProgress(this@DetailActivity, item.id, uri, onProgress, onDone) },
+                                onDeleteImageWithProgress = { url, onProgress, onDone -> vm.deleteImageWithProgress(this@DetailActivity, item.id, url, onProgress, onDone) },
+                                onAddImageUrlsDirect = { urls, done -> vm.addImageUrlsDirect(this@DetailActivity, item.id, urls) { ok -> done(ok) } },
+                                groupOptions = items.flatMap { it.groupNames }.filter { it.isNotBlank() }.distinct().sorted(),
+                                categoryOptions = items.flatMap { it.categories }.filter { it.isNotBlank() }.distinct().sorted()
+                            )
+                        }
                     }
                 }
             }

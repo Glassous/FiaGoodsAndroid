@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material3.Card
@@ -47,6 +49,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.OutlinedTextField
@@ -144,17 +147,17 @@ fun HomeScreen(
                     }
                 }
             } else {
-                val base = if (query.isBlank()) items else items.filter { it.description.contains(query, true) || it.category.contains(query, true) }
+                val base = if (query.isBlank()) items else items.filter { it.description.contains(query, true) || it.categories.any { c -> c.contains(query, true) } }
                 val list = base.filter {
                     val groupMatch = if (selectedGroups.isEmpty() && !includeUngrouped) {
                         true
                     } else {
-                        selectedGroups.contains(it.groupName) || (includeUngrouped && it.groupName.isBlank())
+                        it.groupNames.any { g -> selectedGroups.contains(g) } || (includeUngrouped && it.groupNames.isEmpty())
                     }
                     val categoryMatch = if (selectedCategories.isEmpty() && !includeUncategorized) {
                         true
                     } else {
-                        selectedCategories.contains(it.category) || (includeUncategorized && it.category.isBlank())
+                        it.categories.any { c -> selectedCategories.contains(c) } || (includeUncategorized && it.categories.isEmpty())
                     }
                     groupMatch && categoryMatch && (!favoritesOnly || favorites.contains(it.id))
                 }
@@ -266,8 +269,8 @@ fun HomeScreen(
 
         if (addOpen) {
             var description by remember { mutableStateOf("") }
-            var category by remember { mutableStateOf("") }
-            var groupName by remember { mutableStateOf("") }
+            var newCategories by remember { mutableStateOf<Set<String>>(emptySet()) }
+            var newGroups by remember { mutableStateOf<Set<String>>(emptySet()) }
             var link by remember { mutableStateOf("") }
             var priceText by remember { mutableStateOf("") }
             var imageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -276,25 +279,76 @@ fun HomeScreen(
             val canSave = true
             AppDialog(onDismiss = { addOpen = false }, title = "新增商品", content = {
                 OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text("描述") }, singleLine = true)
-                val groupOptions = remember(items) { items.map { it.groupName }.filter { it.isNotBlank() }.distinct().sorted() }
-                val categoryOptions = remember(items) { items.map { it.category }.filter { it.isNotBlank() }.distinct().sorted() }
-                var categoryExpanded by remember { mutableStateOf(false) }
-                val filteredCategories = remember(categoryOptions, category) { if (category.isBlank()) categoryOptions else categoryOptions.filter { it.contains(category, true) } }
-                Box {
-                    OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true, trailingIcon = { IconButton(onClick = { categoryExpanded = !categoryExpanded }) { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) } })
-                    androidx.compose.material3.DropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }) {
-                        filteredCategories.forEach { c ->
-                            androidx.compose.material3.DropdownMenuItem(text = { Text(c) }, onClick = { category = c; categoryExpanded = false })
+                val groupOptions = remember(items) { items.flatMap { it.groupNames }.filter { it.isNotBlank() }.distinct().sorted() }
+                val categoryOptions = remember(items) { items.flatMap { it.categories }.filter { it.isNotBlank() }.distinct().sorted() }
+                Text("类别", style = MaterialTheme.typography.titleMedium)
+                var newCategoryInput by remember { mutableStateOf("") }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(value = newCategoryInput, onValueChange = { newCategoryInput = it }, placeholder = { Text("输入类别后添加") }, singleLine = true, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = {
+                        val v = newCategoryInput.trim()
+                        if (v.isNotBlank()) {
+                            newCategories = newCategories + v
+                            newCategoryInput = ""
+                        }
+                    }) { Text("添加") }
+                }
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(newCategories.toList()) { c ->
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), shape = RoundedCornerShape(20.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                Text(c, style = MaterialTheme.typography.bodyMedium)
+                                Spacer(Modifier.width(8.dp))
+                                Icon(imageVector = Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp).clickable { newCategories = newCategories - c })
+                            }
                         }
                     }
                 }
-                var groupExpanded by remember { mutableStateOf(false) }
-                val filteredGroups = remember(groupOptions, groupName) { if (groupName.isBlank()) groupOptions else groupOptions.filter { it.contains(groupName, true) } }
-                Box {
-                    OutlinedTextField(value = groupName, onValueChange = { groupName = it }, label = { Text("分组") }, singleLine = true, trailingIcon = { IconButton(onClick = { groupExpanded = !groupExpanded }) { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) } })
-                    androidx.compose.material3.DropdownMenu(expanded = groupExpanded, onDismissRequest = { groupExpanded = false }) {
-                        filteredGroups.forEach { g ->
-                            androidx.compose.material3.DropdownMenuItem(text = { Text(g) }, onClick = { groupName = g; groupExpanded = false })
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(categoryOptions.filter { !newCategories.contains(it) }) { c ->
+                        Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.clickable { newCategories = newCategories + c }.border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                Text(c, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("分组", style = MaterialTheme.typography.titleMedium)
+                var newGroupInput by remember { mutableStateOf("") }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(value = newGroupInput, onValueChange = { newGroupInput = it }, placeholder = { Text("输入分组后添加") }, singleLine = true, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = {
+                        val v = newGroupInput.trim()
+                        if (v.isNotBlank()) {
+                            newGroups = newGroups + v
+                            newGroupInput = ""
+                        }
+                    }) { Text("添加") }
+                }
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(newGroups.toList()) { g ->
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), shape = RoundedCornerShape(20.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                Text(g, style = MaterialTheme.typography.bodyMedium)
+                                Spacer(Modifier.width(8.dp))
+                                Icon(imageVector = Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp).clickable { newGroups = newGroups - g })
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(groupOptions.filter { !newGroups.contains(it) }) { g ->
+                        Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.clickable { newGroups = newGroups + g }.border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                Text(g, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                            }
                         }
                     }
                 }
@@ -320,8 +374,8 @@ fun HomeScreen(
                         id = id,
                         description = description,
                         imageUrls = emptyList(),
-                        groupName = groupName,
-                        category = category,
+                        groupNames = newGroups.toList(),
+                        categories = newCategories.toList(),
                         price = priceVal,
                         link = link
                     )
@@ -347,7 +401,9 @@ fun HomeScreen(
                     })
                     addOpen = false
                 }, enabled = canSave) { Text("保存") }
-                androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showCreateDialog = false }, enabled = creating) { Text("后台完成") }
+                if (creating) {
+                    androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showCreateDialog = false }) { Text("后台完成") }
+                }
             })
         }
 
@@ -362,8 +418,12 @@ fun HomeScreen(
                     Text(createError!!, color = MaterialTheme.colorScheme.error)
                 }
             }, actions = {
-                androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showCreateDialog = false }, enabled = creating) { Text("后台完成") }
-                androidx.compose.material3.TextButton(onClick = { showCreateDialog = false }, enabled = !creating) { Text("关闭") }
+                if (creating) {
+                    androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showCreateDialog = false }) { Text("后台完成") }
+                }
+                if (!creating) {
+                    androidx.compose.material3.TextButton(onClick = { showCreateDialog = false }) { Text("关闭") }
+                }
             })
         }
 
@@ -374,8 +434,8 @@ fun HomeScreen(
         }
 
         if (filterOpen) {
-            val groupOptions = remember(items) { items.map { it.groupName }.filter { it.isNotBlank() }.distinct().sorted() }
-            val categoryOptions = remember(items) { items.map { it.category }.filter { it.isNotBlank() }.distinct().sorted() }
+            val groupOptions = remember(items) { items.flatMap { it.groupNames }.filter { it.isNotBlank() }.distinct().sorted() }
+            val categoryOptions = remember(items) { items.flatMap { it.categories }.filter { it.isNotBlank() }.distinct().sorted() }
             var groupExpanded by remember { mutableStateOf(true) }
             var categoryExpanded by remember { mutableStateOf(true) }
             var groupQuery by remember { mutableStateOf("") }

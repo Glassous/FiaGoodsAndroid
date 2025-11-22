@@ -76,6 +76,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
 import androidx.compose.material3.CircularProgressIndicator
 import com.glassous.fiagoods.ui.global.UploadState
 import androidx.compose.ui.platform.LocalConfiguration
@@ -90,8 +91,8 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
     var editing by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var description by remember { mutableStateOf(item.description) }
-    var category by remember { mutableStateOf(item.category) }
-    var groupName by remember { mutableStateOf(item.groupName) }
+    var categories by remember { mutableStateOf(item.categories.toSet()) }
+    var groupNames by remember { mutableStateOf(item.groupNames.toSet()) }
     var link by remember { mutableStateOf(item.link) }
     var priceText by remember { mutableStateOf(String.format("%.2f", item.price)) }
     var deleteCandidateUrl by remember { mutableStateOf<String?>(null) }
@@ -188,8 +189,8 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     IconButton(onClick = {
                         val patch = mutableMapOf<String, Any?>()
                         if (description != item.description) patch["description"] = description
-                        if (category != item.category) patch["category"] = category
-                        if (groupName != item.groupName) patch["group_name"] = groupName
+                        if (categories.toList() != item.categories) patch["categories"] = categories.toList()
+                        if (groupNames.toList() != item.groupNames) patch["group_names"] = groupNames.toList()
                         if (link != item.link) patch["link"] = link
                         val priceVal = priceText.toDoubleOrNull()
                         if (priceVal != null && priceVal != item.price) patch["price"] = priceVal
@@ -383,29 +384,81 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 }
             }
             if (!editing) {
-                item { FieldCard(label = "类别", value = item.category) }
+                item { FieldCard(label = "类别", value = item.categories.joinToString(separator = "、")) }
                 item { FieldCard(label = "售价", value = "¥" + String.format("%.2f", item.price)) }
-                item { FieldCard(label = "分组", value = item.groupName) }
+                item { FieldCard(label = "分组", value = item.groupNames.joinToString(separator = "、")) }
                 item { FieldCard(label = "链接", value = item.link) }
             } else {
                 item {
-                    var categoryExpanded by remember { mutableStateOf(false) }
-                    Box {
-                        OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("类别") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), trailingIcon = { IconButton(onClick = { categoryExpanded = !categoryExpanded }) { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) } })
-                        DropdownMenu(expanded = categoryExpanded, onDismissRequest = { categoryExpanded = false }) {
-                            categoryOptions.forEach { c ->
-                                DropdownMenuItem(text = { Text(c) }, onClick = { category = c; categoryExpanded = false })
+                    Text("类别", style = MaterialTheme.typography.titleMedium)
+                    var newCategoryInput by remember { mutableStateOf("") }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(value = newCategoryInput, onValueChange = { newCategoryInput = it }, placeholder = { Text("输入类别后添加") }, singleLine = true, modifier = Modifier.weight(1f), shape = RoundedCornerShape(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Button(onClick = {
+                            val v = newCategoryInput.trim()
+                            if (v.isNotBlank()) {
+                                categories = categories + v
+                                newCategoryInput = ""
+                            }
+                        }) { Text("添加") }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(categories.toList()) { c ->
+                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), shape = RoundedCornerShape(20.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                    Text(c, style = MaterialTheme.typography.bodyMedium)
+                                    Spacer(Modifier.width(8.dp))
+                                    Icon(imageVector = Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp).clickable { categories = categories - c })
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(categoryOptions.filter { !categories.contains(it) }) { c ->
+                            Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.clickable { categories = categories + c }.border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                    Text(c, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                                }
                             }
                         }
                     }
                 }
                 item {
-                    var groupExpanded by remember { mutableStateOf(false) }
-                    Box {
-                        OutlinedTextField(value = groupName, onValueChange = { groupName = it }, label = { Text("分组") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), trailingIcon = { IconButton(onClick = { groupExpanded = !groupExpanded }) { Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = null) } })
-                        DropdownMenu(expanded = groupExpanded, onDismissRequest = { groupExpanded = false }) {
-                            groupOptions.forEach { g ->
-                                DropdownMenuItem(text = { Text(g) }, onClick = { groupName = g; groupExpanded = false })
+                    Text("分组", style = MaterialTheme.typography.titleMedium)
+                    var newGroupInput by remember { mutableStateOf("") }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(value = newGroupInput, onValueChange = { newGroupInput = it }, placeholder = { Text("输入分组后添加") }, singleLine = true, modifier = Modifier.weight(1f), shape = RoundedCornerShape(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Button(onClick = {
+                            val v = newGroupInput.trim()
+                            if (v.isNotBlank()) {
+                                groupNames = groupNames + v
+                                newGroupInput = ""
+                            }
+                        }) { Text("添加") }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(groupNames.toList()) { g ->
+                            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary), shape = RoundedCornerShape(20.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                    Text(g, style = MaterialTheme.typography.bodyMedium)
+                                    Spacer(Modifier.width(8.dp))
+                                    Icon(imageVector = Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp).clickable { groupNames = groupNames - g })
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(groupOptions.filter { !groupNames.contains(it) }) { g ->
+                            Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.clickable { groupNames = groupNames + g }.border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                                    Text(g, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                                }
                             }
                         }
                     }
@@ -465,7 +518,9 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 }
             }, actions = {
                 androidx.compose.material3.TextButton(onClick = { showBulkDeleteDialog = false }, enabled = !bulkDeleting) { Text("取消") }
-                androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showBulkDeleteDialog = false }, enabled = bulkDeleting) { Text("后台完成") }
+                if (bulkDeleting) {
+                    androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showBulkDeleteDialog = false }) { Text("后台完成") }
+                }
                 androidx.compose.material3.TextButton(onClick = {
                     if (bulkSelected.isNotEmpty()) {
                         bulkDeleting = true
@@ -541,8 +596,12 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 Text(uploadError!!, color = MaterialTheme.colorScheme.error)
             }
         }, actions = {
-            androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showUploadDialog = false }, enabled = uploading) { Text("后台完成") }
-            androidx.compose.material3.TextButton(onClick = { showUploadDialog = false }, enabled = !uploading) { Text("关闭") }
+            if (uploading) {
+                androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); showUploadDialog = false }) { Text("后台完成") }
+            }
+            if (!uploading) {
+                androidx.compose.material3.TextButton(onClick = { showUploadDialog = false }) { Text("关闭") }
+            }
         })
     }
     run {
@@ -586,7 +645,9 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 Text(itemSaveError!!, color = MaterialTheme.colorScheme.error)
             }
         }, actions = {
-            androidx.compose.material3.TextButton(onClick = { showItemSaveDialog = false }, enabled = !savingItem) { Text("关闭") }
+            if (!savingItem) {
+                androidx.compose.material3.TextButton(onClick = { showItemSaveDialog = false }) { Text("关闭") }
+            }
         })
     }
     if (deleteCandidateUrl != null) {
@@ -603,7 +664,9 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
             }
         }, actions = {
             androidx.compose.material3.TextButton(onClick = { deleteCandidateUrl = null }, enabled = !deleting) { Text("取消") }
-            androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); deleteCandidateUrl = null }, enabled = deleting) { Text("后台完成") }
+            if (deleting) {
+                androidx.compose.material3.TextButton(onClick = { UploadState.setBackground(true); deleteCandidateUrl = null }) { Text("后台完成") }
+            }
             androidx.compose.material3.TextButton(onClick = {
                 deleting = true
                 deleteError = null
@@ -633,7 +696,9 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 Text(saveError!!, color = MaterialTheme.colorScheme.error)
             }
         }, actions = {
-            androidx.compose.material3.TextButton(onClick = { showSaveDialog = false }, enabled = !saving) { Text("关闭") }
+            if (!saving) {
+                androidx.compose.material3.TextButton(onClick = { showSaveDialog = false }) { Text("关闭") }
+            }
         })
     }
     if (showDeleteConfirm) {
