@@ -171,7 +171,10 @@ fun HomeScreen(
                 val conf = LocalConfiguration.current
                 var linkUnchangedMap by remember(items) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
                 androidx.compose.runtime.LaunchedEffect(orderedList) {
-                    val widthPx = (conf.screenWidthDp * ctx.resources.displayMetrics.density).toInt()
+                    val cols = columnsPerRow.coerceAtLeast(1)
+                    val density = ctx.resources.displayMetrics.density
+                    val innerWidthDp = conf.screenWidthDp.toFloat() - 24f - 8f * (cols - 1)
+                    val widthPx = ((innerWidthDp / cols) * density).toInt()
                     val heightPx = (widthPx * 9 / 16)
                     data class LinkThumb(val link: String, val preview: String?)
                     val gson = Gson()
@@ -236,7 +239,10 @@ fun HomeScreen(
                                             .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
                                     ) {
                                         val conf = LocalConfiguration.current
-                                        val widthPx = (conf.screenWidthDp * ctx.resources.displayMetrics.density).toInt()
+                                        val cols = columnsPerRow.coerceAtLeast(1)
+                                        val density = ctx.resources.displayMetrics.density
+                                        val innerWidthDp = conf.screenWidthDp.toFloat() - 24f - 8f * (cols - 1)
+                                        val widthPx = ((innerWidthDp / cols) * density).toInt()
                                         val thumbUrl = previewUrl?.let { buildOssThumbnailUrl(it, widthPx) }
                                         val request = remember(thumbUrl) {
                                             ImageRequest.Builder(ctx)
