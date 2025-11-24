@@ -17,6 +17,7 @@ object SessionPrefs {
     private const val KEY_OSS_ACCESS_KEY_SECRET = "oss_access_key_secret"
     private const val KEY_OSS_PUBLIC_BASE_URL = "oss_public_base_url"
     private const val KEY_ITEMS_CACHE_JSON = "items_cache_json"
+    private const val KEY_LINK_SNAPSHOT_JSON = "link_snapshot_json"
     private const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
 
     private fun prefs(context: Context): SharedPreferences {
@@ -82,6 +83,12 @@ object SessionPrefs {
     }
 
     fun getItemsCache(context: Context): String? = prefs(context).getString(KEY_ITEMS_CACHE_JSON, null)
+
+    fun setLinkSnapshot(context: Context, json: String) {
+        prefs(context).edit().putString(KEY_LINK_SNAPSHOT_JSON, json).apply()
+    }
+
+    fun getLinkSnapshot(context: Context): String? = prefs(context).getString(KEY_LINK_SNAPSHOT_JSON, null)
 
     fun isAutoUpdateEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_AUTO_UPDATE_CHECK, true)
     fun setAutoUpdateEnabled(context: Context, enabled: Boolean) {

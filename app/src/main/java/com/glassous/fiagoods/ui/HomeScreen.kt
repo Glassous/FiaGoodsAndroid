@@ -75,6 +75,9 @@ import coil.request.ImageRequest
 import coil.request.CachePolicy
 import coil.compose.LocalImageLoader
 import com.glassous.fiagoods.util.buildOssThumbnailUrl
+import com.glassous.fiagoods.data.SessionPrefs
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
@@ -165,10 +168,22 @@ fun HomeScreen(
                 val clipboard = LocalClipboardManager.current
                 val imageLoader = LocalImageLoader.current
                 val conf = LocalConfiguration.current
+                var linkUnchangedMap by remember(items) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
                 androidx.compose.runtime.LaunchedEffect(list) {
                     val widthPx = (conf.screenWidthDp * ctx.resources.displayMetrics.density).toInt()
                     val heightPx = (widthPx * 9 / 16)
-                    val prefetch = list.take(100).mapNotNull { it.imageUrls.firstOrNull() }
+                    data class LinkThumb(val link: String, val preview: String?)
+                    val gson = Gson()
+                    val prevJson = SessionPrefs.getLinkSnapshot(ctx)
+                    val prevType = object : TypeToken<Map<String, LinkThumb>>() {}.type
+                    val prevMap: Map<String, LinkThumb> = try {
+                        prevJson?.let { gson.fromJson<Map<String, LinkThumb>>(it, prevType) } ?: emptyMap()
+                    } catch (_: Exception) { emptyMap() }
+                    val newUnchanged = list.associate { it.id to ((prevMap[it.id]?.link ?: "") == it.link) }
+                    linkUnchangedMap = newUnchanged
+                    val prefetch = list.take(100)
+                        .filter { !(newUnchanged[it.id] ?: false) }
+                        .mapNotNull { it.imageUrls.firstOrNull() }
                     prefetch.forEach { u ->
                         val t = buildOssThumbnailUrl(u, widthPx)
                         val req = ImageRequest.Builder(ctx)
@@ -182,6 +197,10 @@ fun HomeScreen(
                             .build()
                         imageLoader.enqueue(req)
                     }
+                    val currentMap = list.associate { it.id to LinkThumb(it.link, it.imageUrls.firstOrNull()) }
+                    try {
+                        SessionPrefs.setLinkSnapshot(ctx, gson.toJson(currentMap))
+                    } catch (_: Exception) { }
                 }
                 Column(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
                     OutlinedTextField(
@@ -227,6 +246,7 @@ fun HomeScreen(
                                                 .diskCacheKey(thumbUrl ?: previewUrl)
                                                 .diskCachePolicy(CachePolicy.ENABLED)
                                                 .memoryCachePolicy(CachePolicy.ENABLED)
+                                                .networkCachePolicy(if (linkUnchangedMap[item.id] == true) CachePolicy.READ_ONLY else CachePolicy.ENABLED)
                                                 .crossfade(false)
                                                 .build()
                                         }
