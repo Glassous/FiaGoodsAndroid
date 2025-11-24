@@ -164,12 +164,13 @@ fun HomeScreen(
                     }
                     groupMatch && categoryMatch && (!favoritesOnly || favorites.contains(it.id))
                 }
+                val orderedList = list.sortedByDescending { favorites.contains(it.id) }
                 val ctx = LocalContext.current
                 val clipboard = LocalClipboardManager.current
                 val imageLoader = LocalImageLoader.current
                 val conf = LocalConfiguration.current
                 var linkUnchangedMap by remember(items) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
-                androidx.compose.runtime.LaunchedEffect(list) {
+                androidx.compose.runtime.LaunchedEffect(orderedList) {
                     val widthPx = (conf.screenWidthDp * ctx.resources.displayMetrics.density).toInt()
                     val heightPx = (widthPx * 9 / 16)
                     data class LinkThumb(val link: String, val preview: String?)
@@ -179,9 +180,9 @@ fun HomeScreen(
                     val prevMap: Map<String, LinkThumb> = try {
                         prevJson?.let { gson.fromJson<Map<String, LinkThumb>>(it, prevType) } ?: emptyMap()
                     } catch (_: Exception) { emptyMap() }
-                    val newUnchanged = list.associate { it.id to ((prevMap[it.id]?.link ?: "") == it.link) }
+                    val newUnchanged = orderedList.associate { it.id to ((prevMap[it.id]?.link ?: "") == it.link) }
                     linkUnchangedMap = newUnchanged
-                    val prefetch = list.take(100)
+                    val prefetch = orderedList.take(100)
                         .filter { !(newUnchanged[it.id] ?: false) }
                         .mapNotNull { it.imageUrls.firstOrNull() }
                     prefetch.forEach { u ->
@@ -197,7 +198,7 @@ fun HomeScreen(
                             .build()
                         imageLoader.enqueue(req)
                     }
-                    val currentMap = list.associate { it.id to LinkThumb(it.link, it.imageUrls.firstOrNull()) }
+                    val currentMap = orderedList.associate { it.id to LinkThumb(it.link, it.imageUrls.firstOrNull()) }
                     try {
                         SessionPrefs.setLinkSnapshot(ctx, gson.toJson(currentMap))
                     } catch (_: Exception) { }
@@ -221,7 +222,7 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalItemSpacing = 8.dp
                     ) {
-                        items(list, key = { it.id }) { item ->
+                        items(orderedList, key = { it.id }) { item ->
                             Card(elevation = CardDefaults.cardElevation(), modifier = Modifier.fillMaxWidth().combinedClickable(onClick = { onItemClick(item) }, onLongClick = {
                                 clipboard.setText(AnnotatedString(item.link))
                                 Toast.makeText(ctx, "链接已复制", Toast.LENGTH_SHORT).show()
@@ -276,8 +277,9 @@ fun HomeScreen(
                                         }
                                     }
                                     Column(modifier = Modifier.padding(8.dp)) {
-                                        val title = if (item.description.length <= 7) item.description else item.description.take(7)
-                                        Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                                        val limit = SessionPrefs.getTitleMaxLen(ctx)
+                                        val title = if (limit <= 0) "" else if (item.description.length <= limit) item.description else item.description.take(limit)
+                                        Text(title, style = MaterialTheme.typography.titleMedium)
                                     }
                                 }
                             }

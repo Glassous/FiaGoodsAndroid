@@ -52,6 +52,7 @@ import kotlinx.coroutines.launch
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
+import kotlin.math.roundToInt
 import com.glassous.fiagoods.data.SessionPrefs
 import com.glassous.fiagoods.data.UpdateApi
 import com.glassous.fiagoods.BuildConfig
@@ -90,9 +91,11 @@ class SettingsActivity : ComponentActivity() {
                         Gson().fromJson<List<CargoItem>>(json, type)?.size ?: 0
                     } catch (e: Exception) { 0 }
                 }
+                var titleMaxLen by remember { mutableStateOf(SessionPrefs.getTitleMaxLen(this)) }
                 SettingsScreen(
                     mode = mode,
                     density = density,
+                    titleMaxLen = titleMaxLen,
                     itemCount = itemCount,
                     onBack = { finish() },
                     onModeChange = {
@@ -102,6 +105,10 @@ class SettingsActivity : ComponentActivity() {
                     onDensityChange = {
                         density = it.coerceIn(0, 10)
                         SessionPrefs.setCardDensity(this, density)
+                    },
+                    onTitleLenChange = {
+                        titleMaxLen = it.coerceAtLeast(0)
+                        SessionPrefs.setTitleMaxLen(this, titleMaxLen)
                     }
                 )
             }
@@ -111,7 +118,7 @@ class SettingsActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScreen(mode: String, density: Int, itemCount: Int, onBack: () -> Unit, onModeChange: (String) -> Unit, onDensityChange: (Int) -> Unit) {
+private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, itemCount: Int, onBack: () -> Unit, onModeChange: (String) -> Unit, onDensityChange: (Int) -> Unit, onTitleLenChange: (Int) -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     Scaffold(modifier = Modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0), snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -142,11 +149,67 @@ private fun SettingsScreen(mode: String, density: Int, itemCount: Int, onBack: (
                 ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("主页卡片密度", style = MaterialTheme.typography.titleMedium)
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Button(onClick = { onDensityChange((density - 1).coerceAtLeast(0)) }, modifier = Modifier.weight(1f)) { Text("-") }
-                            Text(density.toString(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                            Button(onClick = { onDensityChange((density + 1).coerceAtMost(10)) }, modifier = Modifier.weight(1f)) { Text("+") }
+                        val ctx = LocalContext.current
+                        var densityDisplay by remember { mutableStateOf(density.toFloat()) }
+                        androidx.compose.material3.Slider(
+                            value = densityDisplay,
+                            onValueChange = { densityDisplay = it.coerceIn(0f, 10f) },
+                            onValueChangeFinished = {
+                                val v = densityDisplay.roundToInt().coerceIn(0, 10)
+                                onDensityChange(v)
+                                try { ctx.sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                            },
+                            valueRange = 0f..10f,
+                            steps = 0
+                        )
+                        Text(densityDisplay.roundToInt().toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("外显字数长度", style = MaterialTheme.typography.titleMedium)
+                        val ctx = LocalContext.current
+                        var unlimited by remember { mutableStateOf(titleMaxLen >= Int.MAX_VALUE / 2) }
+                        var lastLimitedLen by remember { mutableStateOf(if (unlimited) 7 else titleMaxLen.coerceIn(0, 50)) }
+                        var sliderDisplay by remember { mutableStateOf(lastLimitedLen.toFloat()) }
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.Slider(
+                                value = sliderDisplay,
+                                onValueChange = { if (!unlimited) sliderDisplay = it.coerceIn(0f, 50f) },
+                                onValueChangeFinished = {
+                                    if (!unlimited) {
+                                        val v = sliderDisplay.roundToInt().coerceIn(0, 50)
+                                        lastLimitedLen = v
+                                        onTitleLenChange(v)
+                                        try { ctx.sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                                    }
+                                },
+                                valueRange = 0f..50f,
+                                steps = 0,
+                                modifier = Modifier.weight(1f),
+                                enabled = !unlimited
+                            )
+                            androidx.compose.material3.IconButton(onClick = {
+                                unlimited = !unlimited
+                                if (unlimited) {
+                                    lastLimitedLen = sliderDisplay.roundToInt().coerceIn(0, 50)
+                                    onTitleLenChange(Int.MAX_VALUE)
+                                } else {
+                                    sliderDisplay = lastLimitedLen.toFloat()
+                                    onTitleLenChange(lastLimitedLen)
+                                }
+                                try { ctx.sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                            }) {
+                                androidx.compose.material3.Text("∞", style = MaterialTheme.typography.titleLarge)
+                            }
                         }
+                        Text(if (unlimited) "∞" else sliderDisplay.roundToInt().toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("商品总数", style = MaterialTheme.typography.titleMedium)
+                        Text(itemCount.toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     }
                 }
                 ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
@@ -259,12 +322,6 @@ private fun SettingsScreen(mode: String, density: Int, itemCount: Int, onBack: (
                                 }
                             )
                         }
-                    }
-                }
-                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("商品总数", style = MaterialTheme.typography.titleMedium)
-                        Text(itemCount.toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }

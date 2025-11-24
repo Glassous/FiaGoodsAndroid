@@ -105,7 +105,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 lifecycleOwner.lifecycle.addObserver(observer)
-                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                val receiver = object : BroadcastReceiver() {
+                    override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+                        themeMode = SessionPrefs.getThemeMode(this@MainActivity)
+                        cardDensity = SessionPrefs.getCardDensity(this@MainActivity)
+                    }
+                }
+                registerReceiver(receiver, IntentFilter("com.glassous.fiagoods.REFRESH"), Context.RECEIVER_NOT_EXPORTED)
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                    unregisterReceiver(receiver)
+                }
             }
             val isDark = when (themeMode) {
                 "system" -> isSystemInDarkTheme()

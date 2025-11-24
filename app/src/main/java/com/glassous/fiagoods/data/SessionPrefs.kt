@@ -18,6 +18,7 @@ object SessionPrefs {
     private const val KEY_OSS_PUBLIC_BASE_URL = "oss_public_base_url"
     private const val KEY_ITEMS_CACHE_JSON = "items_cache_json"
     private const val KEY_LINK_SNAPSHOT_JSON = "link_snapshot_json"
+    private const val KEY_TITLE_MAX_LEN = "title_max_len"
     private const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
 
     private fun prefs(context: Context): SharedPreferences {
@@ -89,6 +90,12 @@ object SessionPrefs {
     }
 
     fun getLinkSnapshot(context: Context): String? = prefs(context).getString(KEY_LINK_SNAPSHOT_JSON, null)
+
+    fun getTitleMaxLen(context: Context): Int = prefs(context).getInt(KEY_TITLE_MAX_LEN, 7)
+    fun setTitleMaxLen(context: Context, len: Int) {
+        val v = len.coerceAtLeast(0)
+        prefs(context).edit().putInt(KEY_TITLE_MAX_LEN, v).apply()
+    }
 
     fun isAutoUpdateEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_AUTO_UPDATE_CHECK, true)
     fun setAutoUpdateEnabled(context: Context, enabled: Boolean) {
