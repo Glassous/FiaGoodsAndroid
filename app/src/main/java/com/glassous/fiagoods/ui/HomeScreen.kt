@@ -98,6 +98,7 @@ fun HomeScreen(
     onRefresh: () -> Unit
 ) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val ctx = LocalContext.current
     var query by remember { mutableStateOf("") }
     var filterOpen by remember { mutableStateOf(false) }
     var favoritesOnly by remember { mutableStateOf(false) }
@@ -165,12 +166,16 @@ fun HomeScreen(
                     groupMatch && categoryMatch && (!favoritesOnly || favorites.contains(it.id))
                 }
                 val orderedList = list.sortedByDescending { favorites.contains(it.id) }
-                val ctx = LocalContext.current
                 val clipboard = LocalClipboardManager.current
                 val imageLoader = LocalImageLoader.current
                 val conf = LocalConfiguration.current
+                val paginationEnabled = SessionPrefs.isPaginationEnabled(ctx)
+                val pageSize = SessionPrefs.getHomePageSize(ctx).coerceAtLeast(1)
+                var currentPage by remember(orderedList, pageSize, paginationEnabled) { mutableStateOf(1) }
+                val totalPages = if (paginationEnabled) ((orderedList.size + pageSize - 1) / pageSize).coerceAtLeast(1) else 1
+                val displayList = if (paginationEnabled) orderedList.drop(((currentPage - 1).coerceAtLeast(0)) * pageSize).take(pageSize) else orderedList
                 var linkUnchangedMap by remember(items) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
-                androidx.compose.runtime.LaunchedEffect(orderedList) {
+                androidx.compose.runtime.LaunchedEffect(displayList) {
                     val cols = columnsPerRow.coerceAtLeast(1)
                     val density = ctx.resources.displayMetrics.density
                     val innerWidthDp = conf.screenWidthDp.toFloat() - 24f - 8f * (cols - 1)
@@ -183,9 +188,9 @@ fun HomeScreen(
                     val prevMap: Map<String, LinkThumb> = try {
                         prevJson?.let { gson.fromJson<Map<String, LinkThumb>>(it, prevType) } ?: emptyMap()
                     } catch (_: Exception) { emptyMap() }
-                    val newUnchanged = orderedList.associate { it.id to ((prevMap[it.id]?.link ?: "") == it.link) }
+                    val newUnchanged = displayList.associate { it.id to ((prevMap[it.id]?.link ?: "") == it.link) }
                     linkUnchangedMap = newUnchanged
-                    val prefetch = orderedList.take(100)
+                    val prefetch = displayList.take(100)
                         .filter { !(newUnchanged[it.id] ?: false) }
                         .mapNotNull { it.imageUrls.firstOrNull() }
                     prefetch.forEach { u ->
@@ -201,7 +206,7 @@ fun HomeScreen(
                             .build()
                         imageLoader.enqueue(req)
                     }
-                    val currentMap = orderedList.associate { it.id to LinkThumb(it.link, it.imageUrls.firstOrNull()) }
+                    val currentMap = displayList.associate { it.id to LinkThumb(it.link, it.imageUrls.firstOrNull()) }
                     try {
                         SessionPrefs.setLinkSnapshot(ctx, gson.toJson(currentMap))
                     } catch (_: Exception) { }
@@ -218,6 +223,14 @@ fun HomeScreen(
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) }
                     )
                     Spacer(Modifier.height(8.dp))
+                    if (paginationEnabled) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Button(onClick = { if (currentPage > 1) currentPage -= 1 }, enabled = currentPage > 1) { Text("上一页") }
+                            Text("第 $currentPage / $totalPages 页", style = MaterialTheme.typography.bodyMedium)
+                            Button(onClick = { if (currentPage < totalPages) currentPage += 1 }, enabled = currentPage < totalPages) { Text("下一页") }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
                     LazyVerticalStaggeredGrid(
                         columns = StaggeredGridCells.Fixed(columnsPerRow.coerceAtLeast(1)),
                         modifier = Modifier.fillMaxSize(),
@@ -225,7 +238,7 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalItemSpacing = 8.dp
                     ) {
-                        items(orderedList, key = { it.id }) { item ->
+                        items(displayList, key = { it.id }) { item ->
                             Card(elevation = CardDefaults.cardElevation(), modifier = Modifier.fillMaxWidth().combinedClickable(onClick = { onItemClick(item) }, onLongClick = {
                                 clipboard.setText(AnnotatedString(item.link))
                                 Toast.makeText(ctx, "链接已复制", Toast.LENGTH_SHORT).show()

@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
@@ -76,6 +78,8 @@ class SettingsActivity : ComponentActivity() {
         setContent {
             var mode by remember { mutableStateOf(SessionPrefs.getThemeMode(this)) }
             var density by remember { mutableStateOf(SessionPrefs.getCardDensity(this)) }
+            var paginationEnabled by remember { mutableStateOf(SessionPrefs.isPaginationEnabled(this)) }
+            var homePageSize by remember { mutableStateOf(SessionPrefs.getHomePageSize(this)) }
             FiaGoodsTheme(
                 darkTheme = when (mode) {
                     "system" -> isSystemInDarkTheme()
@@ -96,6 +100,8 @@ class SettingsActivity : ComponentActivity() {
                     mode = mode,
                     density = density,
                     titleMaxLen = titleMaxLen,
+                    paginationEnabled = paginationEnabled,
+                    homePageSize = homePageSize,
                     itemCount = itemCount,
                     onBack = { finish() },
                     onModeChange = {
@@ -109,6 +115,16 @@ class SettingsActivity : ComponentActivity() {
                     onTitleLenChange = {
                         titleMaxLen = it.coerceAtLeast(0)
                         SessionPrefs.setTitleMaxLen(this, titleMaxLen)
+                    },
+                    onPaginationChange = { enabled ->
+                        paginationEnabled = enabled
+                        SessionPrefs.setPaginationEnabled(this, enabled)
+                        try { sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                    },
+                    onHomePageSizeChange = { size ->
+                        homePageSize = size.coerceAtLeast(1)
+                        SessionPrefs.setHomePageSize(this, homePageSize)
+                        try { sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
                     }
                 )
             }
@@ -118,7 +134,7 @@ class SettingsActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, itemCount: Int, onBack: () -> Unit, onModeChange: (String) -> Unit, onDensityChange: (Int) -> Unit, onTitleLenChange: (Int) -> Unit) {
+private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginationEnabled: Boolean, homePageSize: Int, itemCount: Int, onBack: () -> Unit, onModeChange: (String) -> Unit, onDensityChange: (Int) -> Unit, onTitleLenChange: (Int) -> Unit, onPaginationChange: (Boolean) -> Unit, onHomePageSizeChange: (Int) -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     Scaffold(modifier = Modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0), snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -126,7 +142,7 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, itemCou
                 title = { Text("设置") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Filled.ArrowBack, contentDescription = null) } }
             )
-            Column(modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, end = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.fillMaxSize().padding(start = 16.dp, top = 16.dp, end = 16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("主题模式", style = MaterialTheme.typography.titleMedium)
@@ -204,6 +220,33 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, itemCou
                             }
                         }
                         Text(if (unlimited) "∞" else sliderDisplay.roundToInt().toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("分页显示与每页数量", style = MaterialTheme.typography.titleMedium)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("启用分页", style = MaterialTheme.typography.bodyMedium)
+                            var enabled by remember { mutableStateOf(paginationEnabled) }
+                            Switch(checked = enabled, onCheckedChange = {
+                                enabled = it
+                                onPaginationChange(it)
+                            })
+                        }
+                        val ctx = LocalContext.current
+                        var sizeDisplay by remember { mutableStateOf(homePageSize.coerceIn(1, 200).toFloat()) }
+                        androidx.compose.material3.Slider(
+                            value = sizeDisplay,
+                            onValueChange = { sizeDisplay = it.coerceIn(1f, 200f) },
+                            onValueChangeFinished = {
+                                val v = sizeDisplay.roundToInt().coerceIn(1, 200)
+                                onHomePageSizeChange(v)
+                                try { ctx.sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                            },
+                            valueRange = 1f..200f,
+                            steps = 0
+                        )
+                        Text(sizeDisplay.roundToInt().toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     }
                 }
                 ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
