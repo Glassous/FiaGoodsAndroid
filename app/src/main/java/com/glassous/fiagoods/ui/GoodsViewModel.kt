@@ -32,43 +32,65 @@ class GoodsViewModel : ViewModel() {
     private val _favorites = MutableStateFlow<Set<String>>(emptySet())
     val favorites: StateFlow<Set<String>> = _favorites
 
-    fun refresh(context: Context, clearBeforeLoad: Boolean = false) {
+    // 修改点：增加 verifyPassword 参数，默认为 false
+    fun refresh(context: Context, clearBeforeLoad: Boolean = false, verifyPassword: Boolean = false) {
         viewModelScope.launch {
             if (clearBeforeLoad) { _items.value = emptyList() }
             _loading.value = true
             _authInvalidMessage.value = null
+
+            // 1. 本地校验 (始终进行)
             if (!SessionPrefs.isVerified(context)) {
                 _items.value = emptyList()
                 _loading.value = false
                 return@launch
             }
-            val remote = withContext(Dispatchers.IO) { api.fetchAppPassword() }
-            val stored = SessionPrefs.getPassword(context)
-            if (remote == null || stored == null || remote != stored) {
-                SessionPrefs.clearVerified(context)
-                _authInvalidMessage.value = "密码已修改，请联系管理员"
-                _items.value = emptyList()
-                _loading.value = false
-                return@launch
+
+            // 2. 远程校验 (仅当 verifyPassword 为 true 时进行)
+            if (verifyPassword) {
+                try {
+                    val remote = withContext(Dispatchers.IO) { api.fetchAppPassword() }
+                    val stored = SessionPrefs.getPassword(context)
+                    // 只有当明确获取到 remote (非 null) 且不一致时才踢出
+                    // 如果 remote 为 null (网络问题)，则跳过校验，允许加载数据
+                    if (remote != null && stored != null && remote != stored) {
+                        SessionPrefs.clearVerified(context)
+                        _authInvalidMessage.value = "密码已修改，请联系管理员"
+                        _items.value = emptyList()
+                        _loading.value = false
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    // 校验过程若发生异常，记录日志或忽略，不阻断数据加载
+                }
             }
-            val ossCfg = withContext(Dispatchers.IO) { api.fetchOssConfig() }
-            SessionPrefs.setOssConfig(
-                context,
-                ossCfg["oss_endpoint"],
-                ossCfg["oss_bucket"],
-                ossCfg["oss_access_key_id"],
-                ossCfg["oss_access_key_secret"],
-                ossCfg["oss_public_base_url"]
-            )
-            val res = withContext(Dispatchers.IO) { api.fetchCargoItems() }
-            val fixed = res.map { it.copy(groupNames = it.groupNames ?: emptyList(), categories = it.categories ?: emptyList()) }
-            _items.value = fixed
-            _favorites.value = fixed.filter { it.isFavorite }.map { it.id }.toSet()
+
+            // 3. 加载配置和数据 (OSS 配置和商品列表)
             try {
-                val json = gson.toJson(fixed)
-                SessionPrefs.setItemsCache(context, json)
-            } catch (_: Exception) { }
-            _loading.value = false
+                val ossCfg = withContext(Dispatchers.IO) { api.fetchOssConfig() }
+                SessionPrefs.setOssConfig(
+                    context,
+                    ossCfg["oss_endpoint"],
+                    ossCfg["oss_bucket"],
+                    ossCfg["oss_access_key_id"],
+                    ossCfg["oss_access_key_secret"],
+                    ossCfg["oss_public_base_url"]
+                )
+                
+                val res = withContext(Dispatchers.IO) { api.fetchCargoItems() }
+                val fixed = res.map { it.copy(groupNames = it.groupNames ?: emptyList(), categories = it.categories ?: emptyList()) }
+                _items.value = fixed
+                _favorites.value = fixed.filter { it.isFavorite }.map { it.id }.toSet()
+                
+                try {
+                    val json = gson.toJson(fixed)
+                    SessionPrefs.setItemsCache(context, json)
+                } catch (_: Exception) { }
+            } catch (e: Exception) {
+                // 数据加载失败
+            } finally {
+                _loading.value = false
+            }
         }
     }
 

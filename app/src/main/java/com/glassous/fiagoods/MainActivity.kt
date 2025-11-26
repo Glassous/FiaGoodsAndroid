@@ -179,7 +179,10 @@ class MainActivity : ComponentActivity() {
                             val items by vm.items.collectAsState()
                             val loading by vm.loading.collectAsState()
                             LaunchedEffect(Unit) { vm.loadCache(this@MainActivity) }
-                            LaunchedEffect(Unit) { vm.refresh(this@MainActivity) }
+                            
+                            // 修改点：进入 App 时的初始化刷新，开启密码校验 (verifyPassword = true)
+                            LaunchedEffect(Unit) { vm.refresh(this@MainActivity, verifyPassword = true) }
+                            
                             val updateApi = remember { UpdateApi() }
                             var showUpdateDialog by remember { mutableStateOf(false) }
                             var latest by remember { mutableStateOf<UpdateApi.VersionInfo?>(null) }
@@ -195,7 +198,8 @@ class MainActivity : ComponentActivity() {
                             DisposableEffect(Unit) {
                                 val receiver = object : BroadcastReceiver() {
                                     override fun onReceive(context: Context, intent: android.content.Intent) {
-                                        vm.refresh(this@MainActivity, clearBeforeLoad = true)
+                                        // 修改点：广播触发的刷新 (如设置页返回)，不校验密码 (verifyPassword = false)
+                                        vm.refresh(this@MainActivity, clearBeforeLoad = true, verifyPassword = false)
                                     }
                                 }
                                 registerReceiver(receiver, IntentFilter("com.glassous.fiagoods.REFRESH"), Context.RECEIVER_NOT_EXPORTED)
@@ -260,7 +264,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             }, onAddImageUrlsDirect = { id, urls, done ->
                                 vm.addImageUrlsDirect(this@MainActivity, id, urls) { ok -> done(ok) }
-                            }, columnsPerRow = cardDensity, onRefresh = { vm.refresh(this@MainActivity, clearBeforeLoad = true) })
+                            }, columnsPerRow = cardDensity, 
+                            // 修改点：下拉刷新，不校验密码 (verifyPassword = false)
+                            onRefresh = { vm.refresh(this@MainActivity, clearBeforeLoad = true, verifyPassword = false) })
                             if (showUpdateDialog && latest != null) {
                                 val l = latest!!
                                 val notes = l.releaseNotes ?: emptyList()
@@ -287,5 +293,4 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}
-}
+}}

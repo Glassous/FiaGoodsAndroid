@@ -61,9 +61,11 @@ class DetailActivity : ComponentActivity() {
                 LaunchedEffect(parsed) {
                     if (parsed != null) {
                         vm.seedItems(listOf(parsed))
-                        vm.refresh(this@DetailActivity)
+                        // 修改点：详情页刷新数据，不校验密码 (verifyPassword = false)
+                        vm.refresh(this@DetailActivity, verifyPassword = false)
                     } else {
-                        vm.refresh(this@DetailActivity)
+                        // 修改点：详情页刷新数据，不校验密码 (verifyPassword = false)
+                        vm.refresh(this@DetailActivity, verifyPassword = false)
                     }
                 }
 
