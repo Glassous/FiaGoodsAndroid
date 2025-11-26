@@ -186,7 +186,7 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginat
                         Text("外显字数长度", style = MaterialTheme.typography.titleMedium)
                         val ctx = LocalContext.current
                         var unlimited by remember { mutableStateOf(titleMaxLen >= Int.MAX_VALUE / 2) }
-                        var lastLimitedLen by remember { mutableStateOf(if (unlimited) 7 else titleMaxLen.coerceIn(0, 50)) }
+                        var lastLimitedLen by remember { mutableStateOf(if (unlimited) SessionPrefs.getTitleMaxLenLimited(ctx).coerceIn(0, 50) else titleMaxLen.coerceIn(0, 50)) }
                         var sliderDisplay by remember { mutableStateOf(lastLimitedLen.toFloat()) }
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             androidx.compose.material3.Slider(
@@ -197,6 +197,7 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginat
                                         val v = sliderDisplay.roundToInt().coerceIn(0, 50)
                                         lastLimitedLen = v
                                         onTitleLenChange(v)
+                                        SessionPrefs.setTitleMaxLenLimited(ctx, v)
                                         try { ctx.sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
                                     }
                                 },
@@ -209,14 +210,26 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginat
                                 unlimited = !unlimited
                                 if (unlimited) {
                                     lastLimitedLen = sliderDisplay.roundToInt().coerceIn(0, 50)
+                                    SessionPrefs.setTitleMaxLenLimited(ctx, lastLimitedLen)
                                     onTitleLenChange(Int.MAX_VALUE)
                                 } else {
+                                    lastLimitedLen = SessionPrefs.getTitleMaxLenLimited(ctx).coerceIn(0, 50)
                                     sliderDisplay = lastLimitedLen.toFloat()
                                     onTitleLenChange(lastLimitedLen)
                                 }
                                 try { ctx.sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
                             }) {
                                 androidx.compose.material3.Text("∞", style = MaterialTheme.typography.titleLarge)
+                            }
+                        }
+                        androidx.compose.runtime.DisposableEffect(Unit) {
+                            onDispose {
+                                if (unlimited) {
+                                    SessionPrefs.setTitleMaxLenLimited(ctx, lastLimitedLen)
+                                } else {
+                                    val v = sliderDisplay.roundToInt().coerceIn(0, 50)
+                                    SessionPrefs.setTitleMaxLenLimited(ctx, v)
+                                }
                             }
                         }
                         Text(if (unlimited) "∞" else sliderDisplay.roundToInt().toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -246,6 +259,12 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginat
                             valueRange = 1f..200f,
                             steps = 0
                         )
+                        androidx.compose.runtime.DisposableEffect(Unit) {
+                            onDispose {
+                                val v = sizeDisplay.roundToInt().coerceIn(1, 200)
+                                onHomePageSizeChange(v)
+                            }
+                        }
                         Text(sizeDisplay.roundToInt().toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     }
                 }

@@ -19,6 +19,7 @@ object SessionPrefs {
     private const val KEY_ITEMS_CACHE_JSON = "items_cache_json"
     private const val KEY_LINK_SNAPSHOT_JSON = "link_snapshot_json"
     private const val KEY_TITLE_MAX_LEN = "title_max_len"
+    private const val KEY_TITLE_MAX_LEN_LIMITED = "title_max_len_limited"
     private const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
     private const val KEY_PAGINATION_ENABLED = "pagination_enabled"
     private const val KEY_HOME_PAGE_SIZE = "home_page_size"
@@ -97,6 +98,12 @@ object SessionPrefs {
     fun setTitleMaxLen(context: Context, len: Int) {
         val v = len.coerceAtLeast(0)
         prefs(context).edit().putInt(KEY_TITLE_MAX_LEN, v).apply()
+    }
+
+    fun getTitleMaxLenLimited(context: Context): Int = prefs(context).getInt(KEY_TITLE_MAX_LEN_LIMITED, 7)
+    fun setTitleMaxLenLimited(context: Context, len: Int) {
+        val v = len.coerceAtLeast(0)
+        prefs(context).edit().putInt(KEY_TITLE_MAX_LEN_LIMITED, v).apply()
     }
 
     fun isAutoUpdateEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_AUTO_UPDATE_CHECK, true)
