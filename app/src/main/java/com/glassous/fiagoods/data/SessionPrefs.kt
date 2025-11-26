@@ -104,7 +104,7 @@ object SessionPrefs {
         prefs(context).edit().putBoolean(KEY_AUTO_UPDATE_CHECK, enabled).apply()
     }
 
-    fun isPaginationEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_PAGINATION_ENABLED, true)
+    fun isPaginationEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_PAGINATION_ENABLED, false)
     fun setPaginationEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_PAGINATION_ENABLED, enabled).apply()
     }
