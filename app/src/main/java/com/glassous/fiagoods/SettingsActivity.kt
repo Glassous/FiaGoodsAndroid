@@ -60,8 +60,8 @@ import com.glassous.fiagoods.data.UpdateApi
 import com.glassous.fiagoods.BuildConfig
 import com.glassous.fiagoods.ui.theme.FiaGoodsTheme
 import com.glassous.fiagoods.data.model.CargoItem
+import com.glassous.fiagoods.data.SupabaseApi
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,8 +91,8 @@ class SettingsActivity : ComponentActivity() {
                 val itemCount = remember {
                     val json = SessionPrefs.getItemsCache(this)
                     if (json.isNullOrBlank()) 0 else try {
-                        val type = object : TypeToken<List<CargoItem>>() {}.type
-                        Gson().fromJson<List<CargoItem>>(json, type)?.size ?: 0
+                        // 【核心修改】：替换匿名内部类，使用 SupabaseApi.TYPE_LIST_CARGO
+                        Gson().fromJson<List<CargoItem>>(json, SupabaseApi.TYPE_LIST_CARGO)?.size ?: 0
                     } catch (e: Exception) { 0 }
                 }
                 var titleMaxLen by remember { mutableStateOf(SessionPrefs.getTitleMaxLen(this)) }
@@ -131,7 +131,7 @@ class SettingsActivity : ComponentActivity() {
         }
     }
 }
-
+// SettingsScreen composable ... (保持原样，省略)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginationEnabled: Boolean, homePageSize: Int, itemCount: Int, onBack: () -> Unit, onModeChange: (String) -> Unit, onDensityChange: (Int) -> Unit, onTitleLenChange: (Int) -> Unit, onPaginationChange: (Boolean) -> Unit, onHomePageSizeChange: (Int) -> Unit) {

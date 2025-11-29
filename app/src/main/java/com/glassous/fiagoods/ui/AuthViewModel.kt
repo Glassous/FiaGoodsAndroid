@@ -27,18 +27,26 @@ class AuthViewModel : ViewModel() {
             _loading.value = true
             _error.value = null
             try {
-                val remote = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { api.fetchAppPassword() }
+                // fetchAppPassword 可能会抛出异常，也可能返回 String
+                val remote = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    api.fetchAppPassword()
+                }
+
                 val input = _passwordInput.value
-                if (remote != null && remote == input) {
+                if (remote == input) {
                     SessionPrefs.setVerified(context, input)
                     _verified.value = true
                 } else {
                     SessionPrefs.clearVerified(context)
-                    _error.value = "密码错误"
+                    _error.value = "密码不匹配 (远程长度:${remote.length})"
                     _verified.value = false
                 }
             } catch (e: Exception) {
-                _error.value = "网络错误"
+                // 【修改点】：直接显示具体的异常信息，而不是 "网络错误"
+                // 这样如果是 Gson 错误，会显示 "Parse Error: ..."
+                // 如果是配置错误，会显示 "Config Error: ..."
+                _error.value = "错误: ${e.message}"
+                e.printStackTrace() // 在 Logcat 中打印堆栈
                 _verified.value = false
             } finally {
                 _loading.value = false

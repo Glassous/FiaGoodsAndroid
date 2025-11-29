@@ -97,18 +97,34 @@ class MainActivity : ComponentActivity() {
             val lifecycleOwner = LocalLifecycleOwner.current
             var themeMode by remember { mutableStateOf(SessionPrefs.getThemeMode(this)) }
             var cardDensity by remember { mutableStateOf(SessionPrefs.getCardDensity(this)) }
+            var titleMaxLen by remember { mutableStateOf(SessionPrefs.getTitleMaxLen(this)) }
+
             DisposableEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
-                        themeMode = SessionPrefs.getThemeMode(this@MainActivity)
-                        cardDensity = SessionPrefs.getCardDensity(this@MainActivity)
+                        // 【优化点】：只有值真正改变时才更新 State，防止从设置页返回时触发不必要的重组（看起来像刷新）
+                        val newMode = SessionPrefs.getThemeMode(this@MainActivity)
+                        if (themeMode != newMode) themeMode = newMode
+
+                        val newDensity = SessionPrefs.getCardDensity(this@MainActivity)
+                        if (cardDensity != newDensity) cardDensity = newDensity
+
+                        val newLen = SessionPrefs.getTitleMaxLen(this@MainActivity)
+                        if (titleMaxLen != newLen) titleMaxLen = newLen
                     }
                 }
                 lifecycleOwner.lifecycle.addObserver(observer)
                 val receiver = object : BroadcastReceiver() {
                     override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
-                        themeMode = SessionPrefs.getThemeMode(this@MainActivity)
-                        cardDensity = SessionPrefs.getCardDensity(this@MainActivity)
+                        // 广播接收时也做同样的优化
+                        val newMode = SessionPrefs.getThemeMode(this@MainActivity)
+                        if (themeMode != newMode) themeMode = newMode
+
+                        val newDensity = SessionPrefs.getCardDensity(this@MainActivity)
+                        if (cardDensity != newDensity) cardDensity = newDensity
+
+                        val newLen = SessionPrefs.getTitleMaxLen(this@MainActivity)
+                        if (titleMaxLen != newLen) titleMaxLen = newLen
                     }
                 }
                 registerReceiver(receiver, IntentFilter("com.glassous.fiagoods.REFRESH"), Context.RECEIVER_NOT_EXPORTED)
@@ -130,162 +146,161 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalImageLoader provides imageLoader) {
                     Scaffold(modifier = Modifier.fillMaxSize(), snackbarHost = { SnackbarHost(snackbarHostState) }, contentWindowInsets = WindowInsets(0)) { innerPadding ->
                         NavHost(navController = navController, startDestination = startDest, modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                        composable(
-                            route = "auth?msg={msg}",
-                            arguments = listOf(navArgument("msg") { type = NavType.StringType; defaultValue = "" })
-                        ) { backStackEntry ->
-                            val authVm: AuthViewModel = viewModel()
-                            val msg = backStackEntry.arguments?.getString("msg").orEmpty()
-                            val displayMsg = msg.takeIf { it.isNotBlank() }
-                            val updateApi = remember { UpdateApi() }
-                            var showUpdateDialog by remember { mutableStateOf(false) }
-                            var latest by remember { mutableStateOf<UpdateApi.VersionInfo?>(null) }
-                            LaunchedEffect(Unit) {
-                                val enabled = SessionPrefs.isAutoUpdateEnabled(this@MainActivity)
-                                if (enabled) {
-                                    val res = updateApi.fetchLatestVersionInfoVerbose()
-                                    val info = res.info
-                                    val hasUpdate = info?.versionCode?.let { it > BuildConfig.VERSION_CODE } ?: false
-                                    if (hasUpdate) { latest = info; showUpdateDialog = true }
+                            composable(
+                                route = "auth?msg={msg}",
+                                arguments = listOf(navArgument("msg") { type = NavType.StringType; defaultValue = "" })
+                            ) { backStackEntry ->
+                                val authVm: AuthViewModel = viewModel()
+                                val msg = backStackEntry.arguments?.getString("msg").orEmpty()
+                                val displayMsg = msg.takeIf { it.isNotBlank() }
+                                val updateApi = remember { UpdateApi() }
+                                var showUpdateDialog by remember { mutableStateOf(false) }
+                                var latest by remember { mutableStateOf<UpdateApi.VersionInfo?>(null) }
+                                LaunchedEffect(Unit) {
+                                    val enabled = SessionPrefs.isAutoUpdateEnabled(this@MainActivity)
+                                    if (enabled) {
+                                        val res = updateApi.fetchLatestVersionInfoVerbose()
+                                        val info = res.info
+                                        val hasUpdate = info?.versionCode?.let { it > BuildConfig.VERSION_CODE } ?: false
+                                        if (hasUpdate) { latest = info; showUpdateDialog = true }
+                                    }
+                                }
+                                AuthScreen(vm = authVm, onVerified = {
+                                    navController.navigate("home") {
+                                        popUpTo("auth") { inclusive = true }
+                                    }
+                                }, message = displayMsg)
+                                if (showUpdateDialog && latest != null) {
+                                    val l = latest!!
+                                    val notes = l.releaseNotes ?: emptyList()
+                                    val content = if (notes.isNotEmpty()) notes.joinToString("\n") else ""
+                                    AppDialog(onDismiss = { showUpdateDialog = false }, title = "有新版本：" + l.versionName, content = {
+                                        androidx.compose.material3.Text(content)
+                                    }, actions = {
+                                        TextButton(onClick = {
+                                            val baseBlank = BuildConfig.APP_DOWNLOAD_BASE_URL.trim().isBlank()
+                                            if (!baseBlank) {
+                                                try {
+                                                    val url = updateApi.buildApkDownloadUrl(l)
+                                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                                    startActivity(intent)
+                                                } catch (_: Exception) { }
+                                            }
+                                        }) { androidx.compose.material3.Text("下载") }
+                                        TextButton(onClick = { showUpdateDialog = false }) { androidx.compose.material3.Text("取消") }
+                                    })
                                 }
                             }
-                            AuthScreen(vm = authVm, onVerified = {
-                                navController.navigate("home") {
-                                    popUpTo("auth") { inclusive = true }
+                            composable("home") {
+                                val items by vm.items.collectAsState()
+                                val loading by vm.loading.collectAsState()
+                                LaunchedEffect(Unit) { vm.loadCache(this@MainActivity) }
+
+                                LaunchedEffect(Unit) { vm.refresh(this@MainActivity, verifyPassword = true) }
+
+                                val updateApi = remember { UpdateApi() }
+                                var showUpdateDialog by remember { mutableStateOf(false) }
+                                var latest by remember { mutableStateOf<UpdateApi.VersionInfo?>(null) }
+                                LaunchedEffect(Unit) {
+                                    val enabled = SessionPrefs.isAutoUpdateEnabled(this@MainActivity)
+                                    if (enabled) {
+                                        val res = updateApi.fetchLatestVersionInfoVerbose()
+                                        val info = res.info
+                                        val hasUpdate = info?.versionCode?.let { it > BuildConfig.VERSION_CODE } ?: false
+                                        if (hasUpdate) { latest = info; showUpdateDialog = true }
+                                    }
                                 }
-                            }, message = displayMsg)
-                            if (showUpdateDialog && latest != null) {
-                                val l = latest!!
-                                val notes = l.releaseNotes ?: emptyList()
-                                val content = if (notes.isNotEmpty()) notes.joinToString("\n") else ""
-                                AppDialog(onDismiss = { showUpdateDialog = false }, title = "有新版本：" + l.versionName, content = {
-                                    androidx.compose.material3.Text(content)
-                                }, actions = {
-                                    TextButton(onClick = {
-                                        val baseBlank = BuildConfig.APP_DOWNLOAD_BASE_URL.trim().isBlank()
-                                        if (!baseBlank) {
-                                            try {
-                                                val url = updateApi.buildApkDownloadUrl(l)
-                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                                startActivity(intent)
-                                            } catch (_: Exception) { }
+                                DisposableEffect(Unit) {
+                                    val receiver = object : BroadcastReceiver() {
+                                        override fun onReceive(context: Context, intent: android.content.Intent) {
+                                            vm.refresh(this@MainActivity, clearBeforeLoad = true, verifyPassword = false)
                                         }
-                                    }) { androidx.compose.material3.Text("下载") }
-                                    TextButton(onClick = { showUpdateDialog = false }) { androidx.compose.material3.Text("取消") }
-                                })
-                            }
-                        }
-                        composable("home") {
-                            val items by vm.items.collectAsState()
-                            val loading by vm.loading.collectAsState()
-                            LaunchedEffect(Unit) { vm.loadCache(this@MainActivity) }
-                            
-                            // 修改点：进入 App 时的初始化刷新，开启密码校验 (verifyPassword = true)
-                            LaunchedEffect(Unit) { vm.refresh(this@MainActivity, verifyPassword = true) }
-                            
-                            val updateApi = remember { UpdateApi() }
-                            var showUpdateDialog by remember { mutableStateOf(false) }
-                            var latest by remember { mutableStateOf<UpdateApi.VersionInfo?>(null) }
-                            LaunchedEffect(Unit) {
-                                val enabled = SessionPrefs.isAutoUpdateEnabled(this@MainActivity)
-                                if (enabled) {
-                                    val res = updateApi.fetchLatestVersionInfoVerbose()
-                                    val info = res.info
-                                    val hasUpdate = info?.versionCode?.let { it > BuildConfig.VERSION_CODE } ?: false
-                                    if (hasUpdate) { latest = info; showUpdateDialog = true }
+                                    }
+                                    registerReceiver(receiver, IntentFilter("com.glassous.fiagoods.REFRESH"), Context.RECEIVER_NOT_EXPORTED)
+                                    onDispose { unregisterReceiver(receiver) }
                                 }
-                            }
-                            DisposableEffect(Unit) {
-                                val receiver = object : BroadcastReceiver() {
-                                    override fun onReceive(context: Context, intent: android.content.Intent) {
-                                        // 修改点：广播触发的刷新 (如设置页返回)，不校验密码 (verifyPassword = false)
-                                        vm.refresh(this@MainActivity, clearBeforeLoad = true, verifyPassword = false)
+                                val msg by vm.authInvalidMessage.collectAsState()
+                                val opMsg by vm.operationMessage.collectAsState()
+                                LaunchedEffect(msg) {
+                                    if (msg != null) {
+                                        val encoded = Uri.encode(msg!!)
+                                        vm.clearAuthMessage()
+                                        navController.navigate("auth?msg=$encoded") {
+                                            popUpTo("home") { inclusive = true }
+                                        }
                                     }
                                 }
-                                registerReceiver(receiver, IntentFilter("com.glassous.fiagoods.REFRESH"), Context.RECEIVER_NOT_EXPORTED)
-                                onDispose { unregisterReceiver(receiver) }
-                            }
-                            val msg by vm.authInvalidMessage.collectAsState()
-                            val opMsg by vm.operationMessage.collectAsState()
-                            LaunchedEffect(msg) {
-                                if (msg != null) {
-                                    val encoded = Uri.encode(msg!!)
-                                    vm.clearAuthMessage()
-                                    navController.navigate("auth?msg=$encoded") {
-                                        popUpTo("home") { inclusive = true }
+                                LaunchedEffect(opMsg) {
+                                    val m = opMsg
+                                    if (m != null) {
+                                        val suppressed = setOf("图片上传成功", "图片URL添加成功", "新增商品成功")
+                                        if (!suppressed.contains(m)) {
+                                            snackbarHostState.showSnackbar(m)
+                                        }
+                                        vm.clearOperationMessage()
                                     }
                                 }
-                            }
-                            LaunchedEffect(opMsg) {
-                                val m = opMsg
-                                if (m != null) {
-                                    val suppressed = setOf("图片上传成功", "图片URL添加成功", "新增商品成功")
-                                    if (!suppressed.contains(m)) {
-                                        snackbarHostState.showSnackbar(m)
-                                    }
-                                    vm.clearOperationMessage()
-                                }
-                            }
-                            val favorites by vm.favorites.collectAsState()
-                            HomeScreen(items = items, loading = loading, onItemClick = { item ->
-                                val json = com.google.gson.Gson().toJson(item)
-                                startActivity(android.content.Intent(this@MainActivity, DetailActivity::class.java).putExtra("id", item.id).putExtra("item", json))
-                            }, favorites = favorites, onToggleFavorite = { id ->
-                                vm.toggleFavorite(this@MainActivity, id) { }
-                            }, onCreateItemWithImagesAndUrls = { item, uris, urls, onProgress, onDone ->
-                                vm.addItem(this@MainActivity, item) { ok, created ->
-                                    if (!ok) {
-                                        onDone(false)
-                                    } else {
-                                        val targetId = (created?.id) ?: item.id
-                                        vm.addImageUrlsDirect(this@MainActivity, targetId, urls) { okUrls ->
-                                            val total = uris.size
-                                            if (total == 0) {
-                                                onDone(okUrls)
-                                            } else {
-                                                var uploaded = 0
-                                                fun uploadNext() {
-                                                    val u = uris[uploaded]
-                                                    vm.addImage(this@MainActivity, targetId, u) { ok2 ->
-                                                        if (!ok2) {
-                                                            onDone(false)
-                                                        } else {
-                                                            uploaded++
-                                                            onProgress(uploaded, total)
-                                                            if (uploaded >= total) { onDone(true) } else { uploadNext() }
+                                val favorites by vm.favorites.collectAsState()
+                                HomeScreen(items = items, loading = loading, onItemClick = { item ->
+                                    val json = com.google.gson.Gson().toJson(item)
+                                    startActivity(android.content.Intent(this@MainActivity, DetailActivity::class.java).putExtra("id", item.id).putExtra("item", json))
+                                }, favorites = favorites, onToggleFavorite = { id ->
+                                    vm.toggleFavorite(this@MainActivity, id) { }
+                                }, onCreateItemWithImagesAndUrls = { item, uris, urls, onProgress, onDone ->
+                                    vm.addItem(this@MainActivity, item) { ok, created ->
+                                        if (!ok) {
+                                            onDone(false)
+                                        } else {
+                                            val targetId = (created?.id) ?: item.id
+                                            vm.addImageUrlsDirect(this@MainActivity, targetId, urls) { okUrls ->
+                                                val total = uris.size
+                                                if (total == 0) {
+                                                    onDone(okUrls)
+                                                } else {
+                                                    var uploaded = 0
+                                                    fun uploadNext() {
+                                                        val u = uris[uploaded]
+                                                        vm.addImage(this@MainActivity, targetId, u) { ok2 ->
+                                                            if (!ok2) {
+                                                                onDone(false)
+                                                            } else {
+                                                                uploaded++
+                                                                onProgress(uploaded, total)
+                                                                if (uploaded >= total) { onDone(true) } else { uploadNext() }
+                                                            }
                                                         }
                                                     }
+                                                    onProgress(0, total)
+                                                    uploadNext()
                                                 }
-                                                onProgress(0, total)
-                                                uploadNext()
                                             }
                                         }
                                     }
+                                }, onAddImageUrlsDirect = { id, urls, done ->
+                                    vm.addImageUrlsDirect(this@MainActivity, id, urls) { ok -> done(ok) }
+                                }, columnsPerRow = cardDensity,
+                                    titleMaxLen = titleMaxLen, // 【修改点】：传入 titleMaxLen
+                                    onRefresh = { vm.refresh(this@MainActivity, clearBeforeLoad = true, verifyPassword = false) })
+                                if (showUpdateDialog && latest != null) {
+                                    val l = latest!!
+                                    val notes = l.releaseNotes ?: emptyList()
+                                    val content = if (notes.isNotEmpty()) notes.joinToString("\n") else ""
+                                    AppDialog(onDismiss = { showUpdateDialog = false }, title = "有新版本：" + l.versionName, content = {
+                                        androidx.compose.material3.Text(content)
+                                    }, actions = {
+                                        TextButton(onClick = {
+                                            val baseBlank = BuildConfig.APP_DOWNLOAD_BASE_URL.trim().isBlank()
+                                            if (!baseBlank) {
+                                                try {
+                                                    val url = updateApi.buildApkDownloadUrl(l)
+                                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                                    startActivity(intent)
+                                                } catch (_: Exception) { }
+                                            }
+                                        }) { androidx.compose.material3.Text("下载") }
+                                        TextButton(onClick = { showUpdateDialog = false }) { androidx.compose.material3.Text("取消") }
+                                    })
                                 }
-                            }, onAddImageUrlsDirect = { id, urls, done ->
-                                vm.addImageUrlsDirect(this@MainActivity, id, urls) { ok -> done(ok) }
-                            }, columnsPerRow = cardDensity, 
-                            // 修改点：下拉刷新，不校验密码 (verifyPassword = false)
-                            onRefresh = { vm.refresh(this@MainActivity, clearBeforeLoad = true, verifyPassword = false) })
-                            if (showUpdateDialog && latest != null) {
-                                val l = latest!!
-                                val notes = l.releaseNotes ?: emptyList()
-                                val content = if (notes.isNotEmpty()) notes.joinToString("\n") else ""
-                                AppDialog(onDismiss = { showUpdateDialog = false }, title = "有新版本：" + l.versionName, content = {
-                                    androidx.compose.material3.Text(content)
-                                }, actions = {
-                                    TextButton(onClick = {
-                                        val baseBlank = BuildConfig.APP_DOWNLOAD_BASE_URL.trim().isBlank()
-                                        if (!baseBlank) {
-                                            try {
-                                                val url = updateApi.buildApkDownloadUrl(l)
-                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                                startActivity(intent)
-                                            } catch (_: Exception) { }
-                                        }
-                                    }) { androidx.compose.material3.Text("下载") }
-                                    TextButton(onClick = { showUpdateDialog = false }) { androidx.compose.material3.Text("取消") }
-                                })
                             }
                         }
                     }
@@ -293,4 +308,4 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}}
+}

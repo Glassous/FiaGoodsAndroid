@@ -4,12 +4,12 @@ import com.glassous.fiagoods.BuildConfig
 import com.glassous.fiagoods.data.model.CargoItem
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
 import okhttp3.RequestBody
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.lang.reflect.Type
 
 class SupabaseApi {
     private val client = OkHttpClient.Builder()
@@ -21,6 +21,17 @@ class SupabaseApi {
     private val gson = Gson()
     private val baseRest = BuildConfig.SUPABASE_URL.trimEnd('/') + "/rest/v1"
     private val apiKey = BuildConfig.SUPABASE_ANON_KEY
+
+    companion object {
+        // 【核心修改】：使用 getParameterized 动态构建类型，彻底解决 R8 混淆导致的泛型丢失问题
+        // 这里的 List 使用 Java 的 List，但在 Kotlin 中可以直接写 List::class.java
+        val TYPE_LIST_CARGO: Type = TypeToken.getParameterized(List::class.java, CargoItem::class.java).type
+
+        // 内部使用的 Map List 类型
+        private val TYPE_LIST_MAP_STRING: Type = TypeToken.getParameterized(List::class.java,
+            TypeToken.getParameterized(Map::class.java, String::class.java, String::class.java).type
+        ).type
+    }
 
     fun fetchCargoItems(): List<CargoItem> {
         if (baseRest.isBlank() || apiKey.isBlank()) return emptyList()
@@ -35,8 +46,7 @@ class SupabaseApi {
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return emptyList()
                 val body = resp.body?.string() ?: return emptyList()
-                val type = object : TypeToken<List<CargoItem>>() {}.type
-                gson.fromJson<List<CargoItem>>(body, type) ?: emptyList()
+                gson.fromJson<List<CargoItem>>(body, TYPE_LIST_CARGO) ?: emptyList()
             }
         } catch (e: Exception) {
             emptyList()
@@ -56,8 +66,7 @@ class SupabaseApi {
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null
                 val body = resp.body?.string() ?: return null
-                val type = object : TypeToken<List<CargoItem>>() {}.type
-                val list = gson.fromJson<List<CargoItem>>(body, type) ?: emptyList()
+                val list = gson.fromJson<List<CargoItem>>(body, TYPE_LIST_CARGO) ?: emptyList()
                 list.firstOrNull()
             }
         } catch (e: Exception) {
@@ -65,25 +74,45 @@ class SupabaseApi {
         }
     }
 
-    fun fetchAppPassword(): String? {
-        if (baseRest.isBlank() || apiKey.isBlank()) return null
-        return try {
-            val url = "$baseRest/app_secrets?key=eq.login_password&select=value"
-            val req = Request.Builder()
-                .url(url)
-                .addHeader("apikey", apiKey)
-                .addHeader("Authorization", "Bearer $apiKey")
-                .addHeader("Accept", "application/json")
-                .build()
+    @Throws(Exception::class)
+    fun fetchAppPassword(): String {
+        if (baseRest.contains("null") || baseRest.length < 10) throw Exception("Config Error: URL=$baseRest")
+        if (apiKey.isBlank()) throw Exception("Config Error: API Key is blank")
+
+        val url = "$baseRest/app_secrets?key=eq.login_password&select=value"
+        val req = Request.Builder()
+            .url(url)
+            .addHeader("apikey", apiKey)
+            .addHeader("Authorization", "Bearer $apiKey")
+            .addHeader("Accept", "application/json")
+            .build()
+
+        try {
             client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                val body = resp.body?.string() ?: return null
-                val type = object : TypeToken<List<Map<String, String>>>() {}.type
-                val list = gson.fromJson<List<Map<String, String>>>(body, type) ?: emptyList()
-                list.firstOrNull()?.get("value")
+                val body = resp.body?.string() ?: ""
+
+                if (!resp.isSuccessful) {
+                    throw Exception("HTTP ${resp.code}: $body")
+                }
+                if (body.isBlank()) {
+                    throw Exception("Response body is empty")
+                }
+
+                try {
+                    val list = gson.fromJson<List<Map<String, String>>>(body, TYPE_LIST_MAP_STRING)
+
+                    if (list == null) throw Exception("Gson returned null. Body: $body")
+                    if (list.isEmpty()) throw Exception("List is empty. Body: $body")
+
+                    val item = list.firstOrNull() ?: throw Exception("First item null")
+                    return item["value"] ?: throw Exception("Key 'value' not found in: $item")
+
+                } catch (e: Exception) {
+                    throw Exception("Parse Error: ${e.message} | Body snippet: ${body.take(100)}")
+                }
             }
         } catch (e: Exception) {
-            null
+            throw e
         }
     }
 
@@ -100,8 +129,7 @@ class SupabaseApi {
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return emptyMap()
                 val body = resp.body?.string() ?: return emptyMap()
-                val type = object : TypeToken<List<Map<String, String>>>() {}.type
-                val list = gson.fromJson<List<Map<String, String>>>(body, type) ?: emptyList()
+                val list = gson.fromJson<List<Map<String, String>>>(body, TYPE_LIST_MAP_STRING) ?: emptyList()
                 list.associate { (it["key"] ?: "") to (it["value"] ?: "") }.filterKeys { it.isNotBlank() }
             }
         } catch (e: Exception) {
@@ -126,8 +154,7 @@ class SupabaseApi {
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null
                 val resBody = resp.body?.string() ?: return null
-                val type = object : TypeToken<List<CargoItem>>() {}.type
-                val list = gson.fromJson<List<CargoItem>>(resBody, type) ?: emptyList()
+                val list = gson.fromJson<List<CargoItem>>(resBody, TYPE_LIST_CARGO) ?: emptyList()
                 list.firstOrNull()
             }
         } catch (e: Exception) {
@@ -155,8 +182,7 @@ class SupabaseApi {
                 if (resBody.isNullOrBlank()) {
                     return fetchCargoItem(id)
                 }
-                val type = object : TypeToken<List<CargoItem>>() {}.type
-                val list = gson.fromJson<List<CargoItem>>(resBody, type) ?: emptyList()
+                val list = gson.fromJson<List<CargoItem>>(resBody, TYPE_LIST_CARGO) ?: emptyList()
                 if (list.isNotEmpty()) list.first() else fetchCargoItem(id)
             }
         } catch (e: Exception) {
@@ -197,8 +223,7 @@ class SupabaseApi {
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return emptyList()
                 val body = resp.body?.string() ?: return emptyList()
-                val type = object : TypeToken<List<Map<String, String>>>() {}.type
-                val list = gson.fromJson<List<Map<String, String>>>(body, type) ?: emptyList()
+                val list = gson.fromJson<List<Map<String, String>>>(body, TYPE_LIST_MAP_STRING) ?: emptyList()
                 list.mapNotNull { it["item_id"] }
             }
         } catch (e: Exception) {

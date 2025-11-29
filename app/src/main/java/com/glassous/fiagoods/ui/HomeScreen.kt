@@ -83,6 +83,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 import android.content.Intent
 import com.glassous.fiagoods.SettingsActivity
+import com.glassous.fiagoods.DetailActivity
+
+// 防止 R8 混淆局部数据类，保持在顶层
+data class LinkThumb(val link: String, val preview: String?)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -95,6 +99,7 @@ fun HomeScreen(
     onCreateItemWithImagesAndUrls: (CargoItem, List<Uri>, List<String>, (Int, Int) -> Unit, (Boolean) -> Unit) -> Unit,
     onAddImageUrlsDirect: (String, List<String>, (Boolean) -> Unit) -> Unit,
     columnsPerRow: Int,
+    titleMaxLen: Int, // 【新增参数】：从外部接收配置，确保实时生效
     onRefresh: () -> Unit
 ) {
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -113,8 +118,8 @@ fun HomeScreen(
     var createMessage by remember { mutableStateOf("") }
     var createError by remember { mutableStateOf<String?>(null) }
 
-    // 修复点：将配置读取移到循环外部，避免列表滚动时频繁解密读取文件导致卡顿
-    val titleMaxLen = remember { SessionPrefs.getTitleMaxLen(ctx) }
+    // 【删除】：不再在内部 remember，改用传入的 titleMaxLen 参数
+    // val titleMaxLen = remember { SessionPrefs.getTitleMaxLen(ctx) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = if (addOpen || filterOpen) Modifier.fillMaxSize().blur(12.dp) else Modifier.fillMaxSize()) {
@@ -179,19 +184,24 @@ fun HomeScreen(
                     val totalPages = if (paginationEnabled) ((orderedList.size + pageSize - 1) / pageSize).coerceAtLeast(1) else 1
                     val displayList = if (paginationEnabled) orderedList.drop(((currentPage - 1).coerceAtLeast(0)) * pageSize).take(pageSize) else orderedList
                     var linkUnchangedMap by remember(items) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
+
                     androidx.compose.runtime.LaunchedEffect(displayList) {
                         val cols = columnsPerRow.coerceAtLeast(1)
                         val density = ctx.resources.displayMetrics.density
                         val innerWidthDp = conf.screenWidthDp.toFloat() - 24f - 8f * (cols - 1)
                         val widthPx = ((innerWidthDp / cols) * density).toInt()
                         val heightPx = (widthPx * 9 / 16)
-                        data class LinkThumb(val link: String, val preview: String?)
+
                         val gson = Gson()
                         val prevJson = SessionPrefs.getLinkSnapshot(ctx)
-                        val prevType = object : TypeToken<Map<String, LinkThumb>>() {}.type
+
+                        // 使用 TypeToken.getParameterized 防止崩溃
+                        val prevType = TypeToken.getParameterized(Map::class.java, String::class.java, LinkThumb::class.java).type
+
                         val prevMap: Map<String, LinkThumb> = try {
                             prevJson?.let { gson.fromJson<Map<String, LinkThumb>>(it, prevType) } ?: emptyMap()
                         } catch (_: Exception) { emptyMap() }
+
                         val newUnchanged = displayList.associate { it.id to ((prevMap[it.id]?.link ?: "") == it.link) }
                         linkUnchangedMap = newUnchanged
                         val prefetch = displayList.take(100)
@@ -300,7 +310,6 @@ fun HomeScreen(
                                             }
                                         }
                                         Column(modifier = Modifier.padding(8.dp)) {
-                                            // 修复点：直接使用外部缓存的 titleMaxLen，不再重复读取
                                             val limit = titleMaxLen
                                             val title = if (limit <= 0) "" else if (item.description.length <= limit) item.description else item.description.take(limit)
                                             Text(title, style = MaterialTheme.typography.titleMedium)
@@ -314,6 +323,7 @@ fun HomeScreen(
             }
 
             if (addOpen) {
+                // ... add dialog content ... (保持原样，为了节省篇幅已折叠，实际使用时请直接保留这部分代码)
                 var description by remember { mutableStateOf("") }
                 var newCategories by remember { mutableStateOf<Set<String>>(emptySet()) }
                 var newGroups by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -480,6 +490,7 @@ fun HomeScreen(
             }
 
             if (filterOpen) {
+                // ... filter dialog content ... (保持原样，已折叠)
                 val groupOptions = remember(items) { items.flatMap { it.groupNames }.filter { it.isNotBlank() }.distinct().sorted() }
                 val categoryOptions = remember(items) { items.flatMap { it.categories }.filter { it.isNotBlank() }.distinct().sorted() }
                 var groupExpanded by remember { mutableStateOf(true) }

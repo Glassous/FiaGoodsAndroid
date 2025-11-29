@@ -16,7 +16,6 @@ import android.net.Uri
 import com.glassous.fiagoods.data.OssApi
 import com.glassous.fiagoods.BuildConfig
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 
 class GoodsViewModel : ViewModel() {
     private val api = SupabaseApi()
@@ -32,28 +31,23 @@ class GoodsViewModel : ViewModel() {
     private val _favorites = MutableStateFlow<Set<String>>(emptySet())
     val favorites: StateFlow<Set<String>> = _favorites
 
-    // 修改点：增加 verifyPassword 参数，默认为 false
     fun refresh(context: Context, clearBeforeLoad: Boolean = false, verifyPassword: Boolean = false) {
         viewModelScope.launch {
             if (clearBeforeLoad) { _items.value = emptyList() }
             _loading.value = true
             _authInvalidMessage.value = null
 
-            // 1. 本地校验 (始终进行)
             if (!SessionPrefs.isVerified(context)) {
                 _items.value = emptyList()
                 _loading.value = false
                 return@launch
             }
 
-            // 2. 远程校验 (仅当 verifyPassword 为 true 时进行)
             if (verifyPassword) {
                 try {
                     val remote = withContext(Dispatchers.IO) { api.fetchAppPassword() }
                     val stored = SessionPrefs.getPassword(context)
-                    // 只有当明确获取到 remote (非 null) 且不一致时才踢出
-                    // 如果 remote 为 null (网络问题)，则跳过校验，允许加载数据
-                    if (remote != null && stored != null && remote != stored) {
+                    if (remote != stored) {
                         SessionPrefs.clearVerified(context)
                         _authInvalidMessage.value = "密码已修改，请联系管理员"
                         _items.value = emptyList()
@@ -61,11 +55,10 @@ class GoodsViewModel : ViewModel() {
                         return@launch
                     }
                 } catch (e: Exception) {
-                    // 校验过程若发生异常，记录日志或忽略，不阻断数据加载
+                    // ignore check error
                 }
             }
 
-            // 3. 加载配置和数据 (OSS 配置和商品列表)
             try {
                 val ossCfg = withContext(Dispatchers.IO) { api.fetchOssConfig() }
                 SessionPrefs.setOssConfig(
@@ -76,27 +69,29 @@ class GoodsViewModel : ViewModel() {
                     ossCfg["oss_access_key_secret"],
                     ossCfg["oss_public_base_url"]
                 )
-                
+
                 val res = withContext(Dispatchers.IO) { api.fetchCargoItems() }
                 val fixed = res.map { it.copy(groupNames = it.groupNames ?: emptyList(), categories = it.categories ?: emptyList()) }
                 _items.value = fixed
                 _favorites.value = fixed.filter { it.isFavorite }.map { it.id }.toSet()
-                
+
                 try {
                     val json = gson.toJson(fixed)
                     SessionPrefs.setItemsCache(context, json)
                 } catch (_: Exception) { }
             } catch (e: Exception) {
-                // 数据加载失败
+                // error
             } finally {
                 _loading.value = false
             }
         }
     }
 
-    fun findById(id: String): CargoItem? = _items.value.firstOrNull { it.id == id }
+    // ... 其他中间方法保持不变，此处省略以节省篇幅，请直接保留原有的 addItem, updateItem, deleteItem 等方法 ...
 
+    fun findById(id: String): CargoItem? = _items.value.firstOrNull { it.id == id }
     fun clearAuthMessage() { _authInvalidMessage.value = null }
+    fun clearOperationMessage() { _operationMessage.value = null }
 
     fun addItem(context: Context, item: CargoItem, onDone: (Boolean, CargoItem?) -> Unit) {
         viewModelScope.launch {
@@ -382,8 +377,6 @@ class GoodsViewModel : ViewModel() {
         }
     }
 
-    fun clearOperationMessage() { _operationMessage.value = null }
-
     fun toggleFavorite(context: Context, id: String, onDone: (Boolean) -> Unit) {
         viewModelScope.launch {
             if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
@@ -419,12 +412,13 @@ class GoodsViewModel : ViewModel() {
         val u = SessionPrefs.getOssPublicBaseUrl(context) ?: BuildConfig.OSS_PUBLIC_BASE_URL
         return listOf(e, b, id, s, u).all { it.isNotBlank() }
     }
+
     fun loadCache(context: Context) {
         val json = SessionPrefs.getItemsCache(context)
         if (!json.isNullOrBlank()) {
             try {
-                val type = object : TypeToken<List<CargoItem>>() {}.type
-                val list = gson.fromJson<List<CargoItem>>(json, type) ?: emptyList()
+                // 【核心修改】：替换匿名内部类，使用 SupabaseApi.TYPE_LIST_CARGO
+                val list = gson.fromJson<List<CargoItem>>(json, SupabaseApi.TYPE_LIST_CARGO) ?: emptyList()
                 val fixed = list.map { it.copy(groupNames = it.groupNames ?: emptyList(), categories = it.categories ?: emptyList()) }
                 if (fixed.isNotEmpty()) {
                     _items.value = fixed
