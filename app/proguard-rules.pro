@@ -46,3 +46,11 @@
 
 # 6. 解决第三方库 R8 警告
 -dontwarn com.google.errorprone.annotations.**
+
+# ==========================================================
+# 7. Aliyun OSS SDK 防混淆规则 (新增)
+# ==========================================================
+-keep class com.alibaba.sdk.android.oss.** { *; }
+-dontwarn com.alibaba.sdk.android.oss.**
+-keep interface com.alibaba.sdk.android.oss.callback.OSSCompletedCallback { *; }
+-keep interface com.alibaba.sdk.android.oss.callback.OSSProgressCallback { *; }
