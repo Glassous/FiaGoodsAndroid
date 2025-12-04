@@ -6,8 +6,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -72,42 +70,54 @@ fun AuthScreen(vm: AuthViewModel, onVerified: () -> Unit, message: String? = nul
     LaunchedEffect(error) { if (error != null) snackbarHostState.showSnackbar(error!!) }
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }, contentWindowInsets = WindowInsets(0)) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            CenterAlignedTopAppBar(title = { Text("FiaGoods 验证") })
-            Column(modifier = Modifier.fillMaxSize().padding(24.dp).padding(bottom = bottom), verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (message != null) {
-                    ElevatedCard(colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer), modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("提示", style = MaterialTheme.typography.titleMedium)
-                            Text(message, style = MaterialTheme.typography.bodyMedium)
-                        }
+        // 修改：移除 TopAppBar，将标题放入居中的 Column 中，使其整体垂直居中
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(24.dp)
+                .padding(bottom = bottom),
+            verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "FiaGoods 验证",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            if (message != null) {
+                ElevatedCard(colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer), modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("提示", style = MaterialTheme.typography.titleMedium)
+                        Text(message, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
-                var show by androidx.compose.runtime.remember { mutableStateOf(false) }
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { vm.updatePasswordInput(it) },
-                    label = { Text("密码") },
-                    isError = error != null,
-                    singleLine = true,
-                    visualTransformation = if (show) VisualTransformation.None else PasswordVisualTransformation(),
-                    supportingText = { if (error != null) Text(error ?: "", color = MaterialTheme.colorScheme.error) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                    trailingIcon = {
-                        IconButton(onClick = { show = !show }) {
-                            Icon(imageVector = if (show) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = null)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                if (!loading) {
-                    Button(onClick = { vm.verify(ctx) }, enabled = !loading, modifier = Modifier.fillMaxWidth()) { Text("验证") }
-                } else {
-                    ElevatedCard(shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
-                        Row(modifier = Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            LoadingIndicator(color = LoadingIndicatorDefaults.indicatorColor)
-                            Text("正在验证…", style = MaterialTheme.typography.bodyMedium)
-                        }
+            }
+            var show by androidx.compose.runtime.remember { mutableStateOf(false) }
+            OutlinedTextField(
+                value = password,
+                onValueChange = { vm.updatePasswordInput(it) },
+                label = { Text("密码") },
+                isError = error != null,
+                singleLine = true,
+                visualTransformation = if (show) VisualTransformation.None else PasswordVisualTransformation(),
+                supportingText = { if (error != null) Text(error ?: "", color = MaterialTheme.colorScheme.error) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                trailingIcon = {
+                    IconButton(onClick = { show = !show }) {
+                        Icon(imageVector = if (show) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, contentDescription = null)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (!loading) {
+                Button(onClick = { vm.verify(ctx) }, enabled = !loading, modifier = Modifier.fillMaxWidth()) { Text("验证") }
+            } else {
+                ElevatedCard(shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        LoadingIndicator(color = LoadingIndicatorDefaults.indicatorColor)
+                        Text("正在验证…", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
