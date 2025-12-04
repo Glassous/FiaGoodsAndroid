@@ -84,6 +84,8 @@ import android.net.Uri
 import android.content.Intent
 import com.glassous.fiagoods.SettingsActivity
 import com.glassous.fiagoods.DetailActivity
+import androidx.compose.material3.RangeSlider
+import kotlin.math.roundToInt
 
 // 防止 R8 混淆局部数据类，保持在顶层
 data class LinkThumb(val link: String, val preview: String?)
@@ -111,6 +113,7 @@ fun HomeScreen(
     var selectedCategories by remember { mutableStateOf<Set<String>>(emptySet()) }
     var includeUngrouped by remember { mutableStateOf(false) }
     var includeUncategorized by remember { mutableStateOf(false) }
+    var imageCountRange by remember { mutableStateOf(0f..10f) } // 新增：图片数量筛选范围
     var addOpen by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var creating by remember { mutableStateOf(false) }
@@ -172,7 +175,10 @@ fun HomeScreen(
                         } else {
                             it.categories.any { c -> selectedCategories.contains(c) } || (includeUncategorized && it.categories.isEmpty())
                         }
-                        groupMatch && categoryMatch && (!favoritesOnly || favorites.contains(it.id))
+                        val count = it.imageUrls.size
+                        val imageCountMatch = count >= imageCountRange.start.roundToInt() && count <= imageCountRange.endInclusive.roundToInt()
+
+                        groupMatch && categoryMatch && imageCountMatch && (!favoritesOnly || favorites.contains(it.id))
                     }
                     val orderedList = list.sortedByDescending { favorites.contains(it.id) }
                     val clipboard = LocalClipboardManager.current
@@ -551,12 +557,28 @@ fun HomeScreen(
                             }
                         }
                     }
+
+                    // 修改：将图片数量筛选移至类别下方，并移除 steps 实现平滑滑动
+                    Spacer(Modifier.height(12.dp))
+                    Text("图片数量", style = MaterialTheme.typography.titleMedium)
+                    RangeSlider(
+                        value = imageCountRange,
+                        onValueChange = { imageCountRange = it },
+                        valueRange = 0f..10f,
+                        // steps 移除，默认为 0，实现平滑滑动
+                    )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("${imageCountRange.start.roundToInt()}")
+                        Text("${imageCountRange.endInclusive.roundToInt()}")
+                    }
+
                 }, actions = {
                     androidx.compose.material3.TextButton(onClick = {
                         selectedGroups = emptySet()
                         selectedCategories = emptySet()
                         includeUngrouped = false
                         includeUncategorized = false
+                        imageCountRange = 0f..10f // 重置图片数量范围
                     }) { Text("清空") }
                     androidx.compose.material3.TextButton(onClick = { filterOpen = false }) { Text("确定") }
                 })
