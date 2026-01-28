@@ -22,6 +22,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.window.DialogProperties
 
 @Composable
 fun AppDialog(
@@ -30,10 +37,37 @@ fun AppDialog(
     content: @Composable ColumnScope.() -> Unit,
     actions: @Composable RowScope.() -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    val visible = remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible.value = true
+    }
+    
+    val scale by animateFloatAsState(
+        targetValue = if (visible.value) 1f else 0.8f,
+        animationSpec = tween(durationMillis = 150),
+        label = "scale"
+    )
+    
+    val alpha by animateFloatAsState(
+        targetValue = if (visible.value) 1f else 0f,
+        animationSpec = tween(durationMillis = 150),
+        label = "alpha"
+    )
+    
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    this.alpha = alpha
+                }
         ) {
             val config = LocalConfiguration.current
             val maxHeight: Dp = (config.screenHeightDp.dp * 0.7f)

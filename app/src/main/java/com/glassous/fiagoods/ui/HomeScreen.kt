@@ -56,7 +56,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.draw.blur
+
 import java.util.UUID
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
@@ -125,7 +125,7 @@ fun HomeScreen(
     // val titleMaxLen = remember { SessionPrefs.getTitleMaxLen(ctx) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = if (addOpen || filterOpen) Modifier.fillMaxSize().blur(12.dp) else Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
                 title = { Text("FiaGoods") },
                 actions = {
