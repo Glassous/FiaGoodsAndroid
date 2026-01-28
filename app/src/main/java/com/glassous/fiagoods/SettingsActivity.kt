@@ -117,14 +117,22 @@ class SettingsActivity : ComponentActivity() {
                         SessionPrefs.setTitleMaxLen(this, titleMaxLen)
                     },
                     onPaginationChange = { enabled ->
+                        val oldValue = paginationEnabled
                         paginationEnabled = enabled
                         SessionPrefs.setPaginationEnabled(this, enabled)
-                        try { sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                        // 【优化】：只有值真正改变时才发送广播
+                        if (oldValue != enabled) {
+                            try { sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                        }
                     },
                     onHomePageSizeChange = { size ->
+                        val oldValue = homePageSize
                         homePageSize = size.coerceAtLeast(1)
                         SessionPrefs.setHomePageSize(this, homePageSize)
-                        try { sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                        // 【优化】：只有值真正改变时才发送广播
+                        if (oldValue != homePageSize) {
+                            try { sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                        }
                     }
                 )
             }
@@ -165,7 +173,6 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginat
                 ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("主页卡片密度", style = MaterialTheme.typography.titleMedium)
-                        val ctx = LocalContext.current
                         var densityDisplay by remember { mutableStateOf(density.toFloat()) }
                         androidx.compose.material3.Slider(
                             value = densityDisplay,
@@ -173,7 +180,7 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginat
                             onValueChangeFinished = {
                                 val v = densityDisplay.roundToInt().coerceIn(0, 10)
                                 onDensityChange(v)
-                                try { ctx.sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                                // 【优化】：移除广播，MainActivity 会通过 ON_RESUME 自动更新
                             },
                             valueRange = 0f..10f,
                             steps = 0
@@ -198,7 +205,7 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginat
                                         lastLimitedLen = v
                                         onTitleLenChange(v)
                                         SessionPrefs.setTitleMaxLenLimited(ctx, v)
-                                        try { ctx.sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                                        // 【优化】：移除广播，MainActivity 会通过 ON_RESUME 自动更新
                                     }
                                 },
                                 valueRange = 0f..50f,
@@ -217,7 +224,7 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginat
                                     sliderDisplay = lastLimitedLen.toFloat()
                                     onTitleLenChange(lastLimitedLen)
                                 }
-                                try { ctx.sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                                // 【优化】：移除广播，MainActivity 会通过 ON_RESUME 自动更新
                             }) {
                                 androidx.compose.material3.Text("∞", style = MaterialTheme.typography.titleLarge)
                             }
@@ -246,7 +253,6 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginat
                                 onPaginationChange(it)
                             })
                         }
-                        val ctx = LocalContext.current
                         var sizeDisplay by remember { mutableStateOf(homePageSize.coerceIn(1, 200).toFloat()) }
                         androidx.compose.material3.Slider(
                             value = sizeDisplay,
@@ -254,7 +260,7 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginat
                             onValueChangeFinished = {
                                 val v = sizeDisplay.roundToInt().coerceIn(1, 200)
                                 onHomePageSizeChange(v)
-                                try { ctx.sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
+                                // 【优化】：广播已在 onHomePageSizeChange 中处理
                             },
                             valueRange = 1f..200f,
                             steps = 0

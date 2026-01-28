@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
             DisposableEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
-                        // 【优化点】：只有值真正改变时才更新 State，防止从设置页返回时触发不必要的重组（看起来像刷新）
+                        // 【优化】：只更新 UI 状态，不触发数据刷新
                         val newMode = SessionPrefs.getThemeMode(this@MainActivity)
                         if (themeMode != newMode) themeMode = newMode
 
@@ -114,23 +114,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 lifecycleOwner.lifecycle.addObserver(observer)
-                val receiver = object : BroadcastReceiver() {
-                    override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
-                        // 广播接收时也做同样的优化
-                        val newMode = SessionPrefs.getThemeMode(this@MainActivity)
-                        if (themeMode != newMode) themeMode = newMode
-
-                        val newDensity = SessionPrefs.getCardDensity(this@MainActivity)
-                        if (cardDensity != newDensity) cardDensity = newDensity
-
-                        val newLen = SessionPrefs.getTitleMaxLen(this@MainActivity)
-                        if (titleMaxLen != newLen) titleMaxLen = newLen
-                    }
-                }
-                registerReceiver(receiver, IntentFilter("com.glassous.fiagoods.REFRESH"), Context.RECEIVER_NOT_EXPORTED)
                 onDispose {
                     lifecycleOwner.lifecycle.removeObserver(observer)
-                    unregisterReceiver(receiver)
                 }
             }
             val isDark = when (themeMode) {
