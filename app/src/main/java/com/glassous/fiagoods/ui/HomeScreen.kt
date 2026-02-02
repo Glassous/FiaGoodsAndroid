@@ -441,12 +441,13 @@ fun HomeScreen(
                             price = priceVal,
                             link = link
                         )
-                        showCreateDialog = true
+                        // 【静默启动】：不自动弹出进度框，直接进入后台悬浮球模式
                         creating = true
                         createProgress = 0f
                         createMessage = "正在创建商品数据…"
                         createError = null
                         UploadState.start("新增商品")
+                        UploadState.setBackground(true)  // 立即设置为后台模式
                         val urlsList = imageUrlsText.lines().map { it.trim() }.filter { it.isNotBlank() }
                         onCreateItemWithImagesAndUrls(item, imageUris, urlsList, { done, total ->
                             val t = total.coerceAtLeast(1)

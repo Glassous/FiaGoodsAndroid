@@ -381,19 +381,47 @@ class GoodsViewModel : ViewModel() {
         viewModelScope.launch {
             if (!SessionPrefs.isVerified(context)) { onDone(false); return@launch }
             val isFav = _favorites.value.contains(id)
+            val newFavState = !isFav
+            
+            // 【乐观更新】：立即更新 UI
+            _items.value = _items.value.map { 
+                if (it.id == id) it.copy(isFavorite = newFavState) else it 
+            }
+            _favorites.value = if (newFavState) {
+                _favorites.value + id
+            } else {
+                _favorites.value - id
+            }
+            onDone(true)
+            
+            // 后台同步到服务器
             try {
-                val updated = withContext(Dispatchers.IO) { api.updateCargoItem(id, mapOf("is_favorite" to (!isFav))) }
-                if (updated != null) {
-                    _items.value = _items.value.map { if (it.id == id) updated else it }
-                    _favorites.value = _items.value.filter { it.isFavorite }.map { it.id }.toSet()
-                    onDone(true)
-                } else {
+                val updated = withContext(Dispatchers.IO) { 
+                    api.updateCargoItem(id, mapOf("is_favorite" to newFavState)) 
+                }
+                if (updated == null) {
+                    // 服务器更新失败，回滚 UI
+                    _items.value = _items.value.map { 
+                        if (it.id == id) it.copy(isFavorite = isFav) else it 
+                    }
+                    _favorites.value = if (isFav) {
+                        _favorites.value + id
+                    } else {
+                        _favorites.value - id
+                    }
                     _operationMessage.value = if (isFav) "取消收藏失败" else "收藏失败"
-                    onDone(false)
                 }
             } catch (e: Exception) {
+                // 网络异常，回滚 UI
+                _items.value = _items.value.map { 
+                    if (it.id == id) it.copy(isFavorite = isFav) else it 
+                }
+                _favorites.value = if (isFav) {
+                    _favorites.value + id
+                } else {
+                    _favorites.value - id
+                }
                 _operationMessage.value = if (isFav) "取消收藏异常" else "收藏异常"
-                onDone(false)
             }
         }
     }
