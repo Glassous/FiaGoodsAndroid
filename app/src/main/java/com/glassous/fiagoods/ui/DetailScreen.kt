@@ -239,7 +239,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                     if (editing) Button(onClick = { pickNew.launch("image/*") }) { Text("新增图片") }
                 } else if (item.imageUrls.size == 1) {
                     val url = item.imageUrls.first()
-                    Box(modifier = Modifier.fillMaxWidth().heightIn(max = 250.dp).clip(RoundedCornerShape(12.dp))) {
+                    Box(modifier = Modifier.fillMaxWidth().height(250.dp).clip(RoundedCornerShape(12.dp))) {
                         val ctx = LocalContext.current
                         val conf = LocalConfiguration.current
                         val widthPx = (conf.screenWidthDp * ctx.resources.displayMetrics.density).toInt()
@@ -252,7 +252,7 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                         AsyncImage(
                             model = request,
                             contentDescription = null,
-                            contentScale = ContentScale.Fit,
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)).clickable { previewUrl = url }
                         )
                         if (editing) {
@@ -302,17 +302,15 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                 } else {
                     val state = rememberCarouselState { item.imageUrls.size }
                     val density = androidx.compose.ui.platform.LocalDensity.current
-                    var imageHeights by remember { mutableStateOf<Map<Int, androidx.compose.ui.unit.Dp>>(emptyMap()) }
                     HorizontalMultiBrowseCarousel(
                         state = state,
                         preferredItemWidth = 220.dp,
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
+                        modifier = Modifier.fillMaxWidth().height(250.dp).clip(RoundedCornerShape(16.dp)),
                         itemSpacing = 8.dp,
                         flingBehavior = CarouselDefaults.singleAdvanceFlingBehavior(state)
                     ) { itemIndex: Int ->
                         val url = item.imageUrls[itemIndex]
-                        val itemHeight = imageHeights[itemIndex] ?: 220.dp
-                        Box(modifier = Modifier.height(itemHeight).fillMaxWidth().clip(RoundedCornerShape(16.dp))) {
+                        Box(modifier = Modifier.height(250.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp))) {
                             val ctx = LocalContext.current
                             val widthPx = with(density) { 220.dp.toPx().toInt() }
                             val thumbUrl = buildOssThumbnailUrl(url, widthPx)
@@ -324,17 +322,8 @@ fun DetailScreen(item: CargoItem, onBack: () -> Unit, onSave: (String, Map<Strin
                             AsyncImage(
                                 model = request,
                                 contentDescription = null,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).clickable { previewUrl = url },
-                                onSuccess = { success ->
-                                    val dw = success.result.drawable.intrinsicWidth
-                                    val dh = success.result.drawable.intrinsicHeight
-                                    if (dw > 0 && dh > 0) {
-                                        val hPx = with(density) { 220.dp.toPx() } * (dh.toFloat() / dw.toFloat())
-                                        val hDp = with(density) { hPx.toDp() }
-                                        imageHeights = imageHeights + (itemIndex to hDp)
-                                    }
-                                }
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).clickable { previewUrl = url }
                             )
                             if (editing) {
                                 Row(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp), horizontalArrangement = Arrangement.End) {
