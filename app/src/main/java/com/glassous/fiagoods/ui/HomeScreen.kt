@@ -13,6 +13,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -472,7 +474,7 @@ fun HomeScreen(
 
             if (showCreateDialog) {
                 AppDialog(onDismiss = { if (!creating) { showCreateDialog = false } }, title = "新增商品", content = {
-                    androidx.compose.material3.LinearProgressIndicator(progress = createProgress, modifier = Modifier.fillMaxWidth())
+                    LinearWavyProgressIndicator(progress = { createProgress }, modifier = Modifier.fillMaxWidth())
                     Text(((createProgress * 100).toInt()).toString() + "%")
                     if (createMessage.isNotBlank()) {
                         Text(createMessage, style = MaterialTheme.typography.bodyMedium)
@@ -600,7 +602,7 @@ fun HomeScreen(
                         .clickable { showCreateDialog = true; UploadState.setBackground(false) }
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(progress = p, modifier = Modifier.size(40.dp))
+                        CircularWavyProgressIndicator(progress = { p }, modifier = Modifier.size(40.dp))
                         Text(((p * 100).toInt()).toString() + "%", style = MaterialTheme.typography.labelSmall)
                     }
                 }
