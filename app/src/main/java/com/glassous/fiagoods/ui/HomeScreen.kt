@@ -240,7 +240,18 @@ fun HomeScreen(
                             placeholder = { Text("搜索") },
                             shape = RoundedCornerShape(20.dp),
                             modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) }
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            trailingIcon = {
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = query.isNotEmpty(),
+                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
+                                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut()
+                                ) {
+                                    IconButton(onClick = { query = "" }) {
+                                        Icon(Icons.Filled.Close, contentDescription = "清空")
+                                    }
+                                }
+                            }
                         )
                         Spacer(Modifier.height(8.dp))
                         if (paginationEnabled) {
@@ -259,6 +270,7 @@ fun HomeScreen(
                             verticalItemSpacing = 8.dp
                         ) {
                             items(displayList, key = { it.id }) { item ->
+                                val isFavorite = remember(item.id, favorites) { favorites.contains(item.id) }
                                 Card(elevation = CardDefaults.cardElevation(), modifier = Modifier.fillMaxWidth().combinedClickable(onClick = { onItemClick(item) }, onLongClick = {
                                     clipboard.setText(AnnotatedString(item.link))
                                     Toast.makeText(ctx, "链接已复制", Toast.LENGTH_SHORT).show()
@@ -301,7 +313,7 @@ fun HomeScreen(
                                                     }
                                                 }
                                             )
-                                            val tint = if (favorites.contains(item.id)) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface
+                                            val tint = if (isFavorite) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface
                                             Box(
                                                 modifier = Modifier
                                                     .align(Alignment.TopStart)
