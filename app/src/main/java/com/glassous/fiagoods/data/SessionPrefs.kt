@@ -21,8 +21,6 @@ object SessionPrefs {
     private const val KEY_TITLE_MAX_LEN = "title_max_len"
     private const val KEY_TITLE_MAX_LEN_LIMITED = "title_max_len_limited"
     private const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
-    private const val KEY_PAGINATION_ENABLED = "pagination_enabled"
-    private const val KEY_HOME_PAGE_SIZE = "home_page_size"
 
     private fun prefs(context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
@@ -109,16 +107,5 @@ object SessionPrefs {
     fun isAutoUpdateEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_AUTO_UPDATE_CHECK, true)
     fun setAutoUpdateEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_AUTO_UPDATE_CHECK, enabled).apply()
-    }
-
-    fun isPaginationEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_PAGINATION_ENABLED, false)
-    fun setPaginationEnabled(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(KEY_PAGINATION_ENABLED, enabled).apply()
-    }
-
-    fun getHomePageSize(context: Context): Int = prefs(context).getInt(KEY_HOME_PAGE_SIZE, 50)
-    fun setHomePageSize(context: Context, size: Int) {
-        val v = size.coerceAtLeast(1)
-        prefs(context).edit().putInt(KEY_HOME_PAGE_SIZE, v).apply()
     }
 }

@@ -78,8 +78,6 @@ class SettingsActivity : ComponentActivity() {
         setContent {
             var mode by remember { mutableStateOf(SessionPrefs.getThemeMode(this)) }
             var density by remember { mutableStateOf(SessionPrefs.getCardDensity(this)) }
-            var paginationEnabled by remember { mutableStateOf(SessionPrefs.isPaginationEnabled(this)) }
-            var homePageSize by remember { mutableStateOf(SessionPrefs.getHomePageSize(this)) }
             FiaGoodsTheme(
                 darkTheme = when (mode) {
                     "system" -> isSystemInDarkTheme()
@@ -88,21 +86,11 @@ class SettingsActivity : ComponentActivity() {
                 },
                 dynamicColor = true
             ) {
-                val itemCount = remember {
-                    val json = SessionPrefs.getItemsCache(this)
-                    if (json.isNullOrBlank()) 0 else try {
-                        // 【核心修改】：替换匿名内部类，使用 SupabaseApi.TYPE_LIST_CARGO
-                        Gson().fromJson<List<CargoItem>>(json, SupabaseApi.TYPE_LIST_CARGO)?.size ?: 0
-                    } catch (e: Exception) { 0 }
-                }
                 var titleMaxLen by remember { mutableStateOf(SessionPrefs.getTitleMaxLen(this)) }
                 SettingsScreen(
                     mode = mode,
                     density = density,
                     titleMaxLen = titleMaxLen,
-                    paginationEnabled = paginationEnabled,
-                    homePageSize = homePageSize,
-                    itemCount = itemCount,
                     onBack = { finish() },
                     onModeChange = {
                         mode = it
@@ -115,24 +103,6 @@ class SettingsActivity : ComponentActivity() {
                     onTitleLenChange = {
                         titleMaxLen = it.coerceAtLeast(0)
                         SessionPrefs.setTitleMaxLen(this, titleMaxLen)
-                    },
-                    onPaginationChange = { enabled ->
-                        val oldValue = paginationEnabled
-                        paginationEnabled = enabled
-                        SessionPrefs.setPaginationEnabled(this, enabled)
-                        // 【优化】：只有值真正改变时才发送广播
-                        if (oldValue != enabled) {
-                            try { sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
-                        }
-                    },
-                    onHomePageSizeChange = { size ->
-                        val oldValue = homePageSize
-                        homePageSize = size.coerceAtLeast(1)
-                        SessionPrefs.setHomePageSize(this, homePageSize)
-                        // 【优化】：只有值真正改变时才发送广播
-                        if (oldValue != homePageSize) {
-                            try { sendBroadcast(android.content.Intent("com.glassous.fiagoods.REFRESH")) } catch (_: Exception) { }
-                        }
                     }
                 )
             }
@@ -142,7 +112,7 @@ class SettingsActivity : ComponentActivity() {
 // SettingsScreen composable ... (保持原样，省略)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginationEnabled: Boolean, homePageSize: Int, itemCount: Int, onBack: () -> Unit, onModeChange: (String) -> Unit, onDensityChange: (Int) -> Unit, onTitleLenChange: (Int) -> Unit, onPaginationChange: (Boolean) -> Unit, onHomePageSizeChange: (Int) -> Unit) {
+private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, onBack: () -> Unit, onModeChange: (String) -> Unit, onDensityChange: (Int) -> Unit, onTitleLenChange: (Int) -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     Scaffold(modifier = Modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0), snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
@@ -240,44 +210,6 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, paginat
                             }
                         }
                         Text(if (unlimited) "∞" else sliderDisplay.roundToInt().toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                    }
-                }
-                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("分页显示与每页数量", style = MaterialTheme.typography.titleMedium)
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text("启用分页", style = MaterialTheme.typography.bodyMedium)
-                            var enabled by remember { mutableStateOf(paginationEnabled) }
-                            Switch(checked = enabled, onCheckedChange = {
-                                enabled = it
-                                onPaginationChange(it)
-                            })
-                        }
-                        var sizeDisplay by remember { mutableStateOf(homePageSize.coerceIn(1, 200).toFloat()) }
-                        androidx.compose.material3.Slider(
-                            value = sizeDisplay,
-                            onValueChange = { sizeDisplay = it.coerceIn(1f, 200f) },
-                            onValueChangeFinished = {
-                                val v = sizeDisplay.roundToInt().coerceIn(1, 200)
-                                onHomePageSizeChange(v)
-                                // 【优化】：广播已在 onHomePageSizeChange 中处理
-                            },
-                            valueRange = 1f..200f,
-                            steps = 0
-                        )
-                        androidx.compose.runtime.DisposableEffect(Unit) {
-                            onDispose {
-                                val v = sizeDisplay.roundToInt().coerceIn(1, 200)
-                                onHomePageSizeChange(v)
-                            }
-                        }
-                        Text(sizeDisplay.roundToInt().toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                    }
-                }
-                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("商品总数", style = MaterialTheme.typography.titleMedium)
-                        Text(itemCount.toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     }
                 }
                 ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {

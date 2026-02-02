@@ -184,11 +184,7 @@ fun HomeScreen(
                     val clipboard = LocalClipboardManager.current
                     val imageLoader = LocalImageLoader.current
                     val conf = LocalConfiguration.current
-                    val paginationEnabled = SessionPrefs.isPaginationEnabled(ctx)
-                    val pageSize = SessionPrefs.getHomePageSize(ctx).coerceAtLeast(1)
-                    var currentPage by remember(orderedList, pageSize, paginationEnabled) { mutableStateOf(1) }
-                    val totalPages = if (paginationEnabled) ((orderedList.size + pageSize - 1) / pageSize).coerceAtLeast(1) else 1
-                    val displayList = if (paginationEnabled) orderedList.drop(((currentPage - 1).coerceAtLeast(0)) * pageSize).take(pageSize) else orderedList
+                    val displayList = orderedList
                     var linkUnchangedMap by remember(items) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
 
                     androidx.compose.runtime.LaunchedEffect(displayList) {
@@ -254,14 +250,6 @@ fun HomeScreen(
                             }
                         )
                         Spacer(Modifier.height(8.dp))
-                        if (paginationEnabled) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Button(onClick = { if (currentPage > 1) currentPage -= 1 }, enabled = currentPage > 1) { Text("上一页") }
-                                Text("第 $currentPage / $totalPages 页", style = MaterialTheme.typography.bodyMedium)
-                                Button(onClick = { if (currentPage < totalPages) currentPage += 1 }, enabled = currentPage < totalPages) { Text("下一页") }
-                            }
-                            Spacer(Modifier.height(8.dp))
-                        }
                         LazyVerticalStaggeredGrid(
                             columns = StaggeredGridCells.Fixed(columnsPerRow.coerceAtLeast(1)),
                             modifier = Modifier.fillMaxSize(),
