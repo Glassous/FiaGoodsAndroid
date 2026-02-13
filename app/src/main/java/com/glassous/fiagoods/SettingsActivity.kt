@@ -51,6 +51,8 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
@@ -114,6 +116,21 @@ class SettingsActivity : ComponentActivity() {
 @Composable
 private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, onBack: () -> Unit, onModeChange: (String) -> Unit, onDensityChange: (Int) -> Unit, onTitleLenChange: (Int) -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val ctx = LocalContext.current
+    var goodsCount by remember { mutableStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val json = SessionPrefs.getItemsCache(ctx)
+            if (!json.isNullOrBlank()) {
+                try {
+                    val list = Gson().fromJson<List<CargoItem>>(json, SupabaseApi.TYPE_LIST_CARGO)
+                    goodsCount = list?.size ?: 0
+                } catch (_: Exception) { }
+            }
+        }
+    }
+
     Scaffold(modifier = Modifier.fillMaxSize(), contentWindowInsets = WindowInsets(0), snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             TopAppBar(
@@ -210,6 +227,12 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, onBack:
                             }
                         }
                         Text(if (unlimited) "∞" else sliderDisplay.roundToInt().toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("商品总数", style = MaterialTheme.typography.titleMedium)
+                        Text(goodsCount.toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     }
                 }
                 ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
