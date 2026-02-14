@@ -238,6 +238,28 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, onBack:
                 }
                 ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
                     val ctx = LocalContext.current
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("广告设置", style = MaterialTheme.typography.titleMedium)
+                        var adsEnabled by remember { mutableStateOf(SessionPrefs.isAdsEnabled(ctx)) }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                val new = !adsEnabled
+                                SessionPrefs.setAdsEnabled(ctx, new)
+                                adsEnabled = new
+                            }.padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("启用广告", style = MaterialTheme.typography.bodyMedium)
+                            Switch(checked = adsEnabled, onCheckedChange = {
+                                SessionPrefs.setAdsEnabled(ctx, it)
+                                adsEnabled = it
+                            })
+                        }
+                    }
+                }
+                ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
+                    val ctx = LocalContext.current
                     val scope = rememberCoroutineScope()
                     var checking by remember { mutableStateOf(false) }
                     var latest by remember { mutableStateOf<UpdateApi.VersionInfo?>(null) }
@@ -297,25 +319,6 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, onBack:
                                 SessionPrefs.setAutoUpdateEnabled(ctx, it)
                             })
                         }
-                        
-                        // Ad Settings
-                        var adsEnabled by remember { mutableStateOf(SessionPrefs.isAdsEnabled(ctx)) }
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable {
-                                val new = !adsEnabled
-                                SessionPrefs.setAdsEnabled(ctx, new)
-                                adsEnabled = new
-                            }.padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("启用广告", style = MaterialTheme.typography.bodyMedium)
-                            Switch(checked = adsEnabled, onCheckedChange = {
-                                SessionPrefs.setAdsEnabled(ctx, it)
-                                adsEnabled = it
-                            })
-                        }
-                        Text("关闭后下次启动不再显示广告。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (checking) {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }
