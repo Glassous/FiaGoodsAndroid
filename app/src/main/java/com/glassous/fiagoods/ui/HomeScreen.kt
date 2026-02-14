@@ -91,6 +91,7 @@ import coil.request.CachePolicy
 import coil.imageLoader
 import com.glassous.fiagoods.util.buildOssThumbnailUrl
 import com.glassous.fiagoods.data.SessionPrefs
+import com.glassous.fiagoods.data.UpdateApi
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -137,13 +138,29 @@ fun HomeScreen(
     var createError by remember { mutableStateOf<String?>(null) }
 
     val imageLoader = ctx.imageLoader
-    val artTitleUrl = remember {
+    // Initialize with default path immediately to ensure fallback
+    var artTitleUrl by remember { 
         val versionUrl = com.glassous.fiagoods.BuildConfig.APP_VERSION_JSON_URL.trim()
         val lastSlash = versionUrl.lastIndexOf('/')
         if (lastSlash != -1) {
-            versionUrl.substring(0, lastSlash + 1) + "arttitle.png"
+            mutableStateOf(versionUrl.substring(0, lastSlash + 1) + "arttitle.png")
         } else {
-            ""
+            mutableStateOf("")
+        }
+    }
+    val updateApi = remember { UpdateApi() }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        // Fetch version info to see if we need to switch to a versioned image
+        val result = updateApi.fetchLatestVersionInfoVerbose()
+        val info = result.info
+        if (info?.artTitleVersion != null) {
+            val versionUrl = com.glassous.fiagoods.BuildConfig.APP_VERSION_JSON_URL.trim()
+            val lastSlash = versionUrl.lastIndexOf('/')
+            if (lastSlash != -1) {
+                val basePath = versionUrl.substring(0, lastSlash + 1)
+                artTitleUrl = "${basePath}arttitle_${info.artTitleVersion}.png"
+            }
         }
     }
     var showArtTitle by remember { mutableStateOf(false) }

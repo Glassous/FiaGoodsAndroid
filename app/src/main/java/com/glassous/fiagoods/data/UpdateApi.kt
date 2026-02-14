@@ -2,6 +2,7 @@ package com.glassous.fiagoods.data
 
 import com.glassous.fiagoods.BuildConfig
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +22,9 @@ class UpdateApi {
         val versionName: String,
         val apkFileName: String,
         val releaseNotes: List<String>?,
-        val publishedAt: String?
+        val publishedAt: String?,
+        @SerializedName("artTitleVersion")
+        val artTitleVersion: Int? = null
     )
 
     data class FetchResult(
@@ -37,7 +40,9 @@ class UpdateApi {
         if (url.isBlank()) return FetchResult(null, "APP_VERSION_JSON_URL is blank", null, null, "")
         return withContext(Dispatchers.IO) {
             try {
-                val req = Request.Builder().url(url).get().build()
+                // Add timestamp to prevent caching
+                val urlWithTimestamp = if (url.contains("?")) "$url&t=${System.currentTimeMillis()}" else "$url?t=${System.currentTimeMillis()}"
+                val req = Request.Builder().url(urlWithTimestamp).get().build()
                 client.newCall(req).execute().use { resp ->
                     val body = resp.body?.string()
                     val preview = body?.let { if (it.length > 512) it.substring(0, 512) else it }
