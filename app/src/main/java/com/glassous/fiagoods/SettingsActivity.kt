@@ -250,6 +250,7 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, onBack:
                         Text("当前版本：" + BuildConfig.VERSION_NAME, style = MaterialTheme.typography.bodyMedium)
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = {
+                                SessionPrefs.clearIgnoredVersions(ctx) // Clear ignored versions on manual check
                                 val blank = BuildConfig.APP_VERSION_JSON_URL.trim().isBlank()
                                 if (blank) {
                                     error = "APP_VERSION_JSON_URL is blank"

@@ -21,6 +21,7 @@ object SessionPrefs {
     private const val KEY_TITLE_MAX_LEN = "title_max_len"
     private const val KEY_TITLE_MAX_LEN_LIMITED = "title_max_len_limited"
     private const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
+    private const val KEY_IGNORED_VERSIONS = "ignored_versions"
 
     private fun prefs(context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
@@ -107,5 +108,19 @@ object SessionPrefs {
     fun isAutoUpdateEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_AUTO_UPDATE_CHECK, true)
     fun setAutoUpdateEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_AUTO_UPDATE_CHECK, enabled).apply()
+    }
+
+    fun getIgnoredVersions(context: Context): Set<String> {
+        return prefs(context).getStringSet(KEY_IGNORED_VERSIONS, emptySet()) ?: emptySet()
+    }
+
+    fun addIgnoredVersion(context: Context, versionCode: String) {
+        val current = getIgnoredVersions(context).toMutableSet()
+        current.add(versionCode)
+        prefs(context).edit().putStringSet(KEY_IGNORED_VERSIONS, current).apply()
+    }
+
+    fun clearIgnoredVersions(context: Context) {
+        prefs(context).edit().remove(KEY_IGNORED_VERSIONS).apply()
     }
 }

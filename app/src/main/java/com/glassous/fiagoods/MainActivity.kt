@@ -147,7 +147,8 @@ class MainActivity : ComponentActivity() {
                                         val res = updateApi.fetchLatestVersionInfoVerbose()
                                         val info = res.info
                                         val hasUpdate = info?.versionCode?.let { it > BuildConfig.VERSION_CODE } ?: false
-                                        if (hasUpdate) { latest = info; showUpdateDialog = true }
+                                        val ignored = info?.versionCode?.let { SessionPrefs.getIgnoredVersions(this@MainActivity).contains(it.toString()) } ?: false
+                                        if (hasUpdate && !ignored) { latest = info; showUpdateDialog = true }
                                     }
                                 }
                                 AuthScreen(vm = authVm, onVerified = {
@@ -162,6 +163,10 @@ class MainActivity : ComponentActivity() {
                                     AppDialog(onDismiss = { showUpdateDialog = false }, title = "有新版本：" + l.versionName, content = {
                                         androidx.compose.material3.Text(content)
                                     }, actions = {
+                                        TextButton(onClick = {
+                                            SessionPrefs.addIgnoredVersion(this@MainActivity, l.versionCode.toString())
+                                            showUpdateDialog = false
+                                        }) { androidx.compose.material3.Text("忽略此版本") }
                                         TextButton(onClick = {
                                             val baseBlank = BuildConfig.APP_DOWNLOAD_BASE_URL.trim().isBlank()
                                             if (!baseBlank) {
@@ -192,7 +197,8 @@ class MainActivity : ComponentActivity() {
                                         val res = updateApi.fetchLatestVersionInfoVerbose()
                                         val info = res.info
                                         val hasUpdate = info?.versionCode?.let { it > BuildConfig.VERSION_CODE } ?: false
-                                        if (hasUpdate) { latest = info; showUpdateDialog = true }
+                                        val ignored = info?.versionCode?.let { SessionPrefs.getIgnoredVersions(this@MainActivity).contains(it.toString()) } ?: false
+                                        if (hasUpdate && !ignored) { latest = info; showUpdateDialog = true }
                                     }
                                 }
                                 DisposableEffect(Unit) {
@@ -273,6 +279,10 @@ class MainActivity : ComponentActivity() {
                                     AppDialog(onDismiss = { showUpdateDialog = false }, title = "有新版本：" + l.versionName, content = {
                                         androidx.compose.material3.Text(content)
                                     }, actions = {
+                                        TextButton(onClick = {
+                                            SessionPrefs.addIgnoredVersion(this@MainActivity, l.versionCode.toString())
+                                            showUpdateDialog = false
+                                        }) { androidx.compose.material3.Text("忽略此版本") }
                                         TextButton(onClick = {
                                             val baseBlank = BuildConfig.APP_DOWNLOAD_BASE_URL.trim().isBlank()
                                             if (!baseBlank) {
