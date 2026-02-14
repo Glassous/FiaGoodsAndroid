@@ -169,7 +169,7 @@ fun HomeScreen(
         if (artTitleUrl.isNotBlank()) {
             val request = ImageRequest.Builder(ctx)
                 .data(artTitleUrl)
-                .diskCachePolicy(CachePolicy.ENABLED)
+                .diskCachePolicy(CachePolicy.DISABLED)
                 .memoryCachePolicy(CachePolicy.ENABLED)
                 .networkCachePolicy(CachePolicy.ENABLED)
                 .listener(
@@ -204,7 +204,7 @@ fun HomeScreen(
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(artTitleUrl)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .diskCachePolicy(CachePolicy.DISABLED)
                                     .memoryCachePolicy(CachePolicy.ENABLED)
                                     .networkCachePolicy(CachePolicy.ENABLED)
                                     .crossfade(true)
