@@ -22,6 +22,7 @@ object SessionPrefs {
     private const val KEY_TITLE_MAX_LEN_LIMITED = "title_max_len_limited"
     private const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
     private const val KEY_IGNORED_VERSIONS = "ignored_versions"
+    private const val KEY_ADS_ENABLED = "ads_enabled"
 
     private fun prefs(context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
@@ -122,5 +123,10 @@ object SessionPrefs {
 
     fun clearIgnoredVersions(context: Context) {
         prefs(context).edit().remove(KEY_IGNORED_VERSIONS).apply()
+    }
+
+    fun isAdsEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ADS_ENABLED, true)
+    fun setAdsEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ADS_ENABLED, enabled).apply()
     }
 }

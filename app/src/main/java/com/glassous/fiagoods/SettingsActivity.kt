@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.width
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -296,6 +297,25 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, onBack:
                                 SessionPrefs.setAutoUpdateEnabled(ctx, it)
                             })
                         }
+                        
+                        // Ad Settings
+                        var adsEnabled by remember { mutableStateOf(SessionPrefs.isAdsEnabled(ctx)) }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                val new = !adsEnabled
+                                SessionPrefs.setAdsEnabled(ctx, new)
+                                adsEnabled = new
+                            }.padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("启用广告", style = MaterialTheme.typography.bodyMedium)
+                            Switch(checked = adsEnabled, onCheckedChange = {
+                                SessionPrefs.setAdsEnabled(ctx, it)
+                                adsEnabled = it
+                            })
+                        }
+                        Text("关闭后下次启动不再显示广告。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (checking) {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }

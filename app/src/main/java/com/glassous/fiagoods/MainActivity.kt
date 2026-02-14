@@ -58,8 +58,15 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import okhttp3.Cache
 import okhttp3.OkHttpClient
+import com.glassous.fiagoods.data.AdApi
+import com.glassous.fiagoods.data.AdItem
+import com.glassous.fiagoods.ui.components.AdsDialog
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        var hasShownAds = false
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -232,6 +239,24 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 val favorites by vm.favorites.collectAsState()
+
+                                var showAdDialog by remember { mutableStateOf(false) }
+                                var adList by remember { mutableStateOf<List<AdItem>>(emptyList()) }
+                                LaunchedEffect(Unit) {
+                                    val adsEnabled = SessionPrefs.isAdsEnabled(this@MainActivity)
+                                    if (adsEnabled && !MainActivity.hasShownAds) {
+                                        val ads = AdApi().fetchAds()
+                                        if (ads.isNotEmpty()) {
+                                            adList = ads
+                                            showAdDialog = true
+                                            MainActivity.hasShownAds = true
+                                        }
+                                    }
+                                }
+                                if (showAdDialog) {
+                                    AdsDialog(ads = adList, onDismiss = { showAdDialog = false })
+                                }
+
                                 HomeScreen(items = items, loading = loading, onItemClick = { item ->
                                     val json = com.google.gson.Gson().toJson(item)
                                     startActivity(android.content.Intent(this@MainActivity, DetailActivity::class.java).putExtra("id", item.id).putExtra("item", json))
