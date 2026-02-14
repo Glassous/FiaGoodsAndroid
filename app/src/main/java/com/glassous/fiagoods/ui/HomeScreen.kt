@@ -1,5 +1,14 @@
 package com.glassous.fiagoods.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
@@ -79,7 +88,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import android.widget.Toast
 import coil.request.ImageRequest
 import coil.request.CachePolicy
-import coil.compose.LocalImageLoader
+import coil.imageLoader
 import com.glassous.fiagoods.util.buildOssThumbnailUrl
 import com.glassous.fiagoods.data.SessionPrefs
 import com.google.gson.Gson
@@ -127,13 +136,71 @@ fun HomeScreen(
     var createMessage by remember { mutableStateOf("") }
     var createError by remember { mutableStateOf<String?>(null) }
 
+    val imageLoader = ctx.imageLoader
+    val artTitleUrl = remember {
+        val versionUrl = com.glassous.fiagoods.BuildConfig.APP_VERSION_JSON_URL.trim()
+        val lastSlash = versionUrl.lastIndexOf('/')
+        if (lastSlash != -1) {
+            versionUrl.substring(0, lastSlash + 1) + "arttitle.png"
+        } else {
+            ""
+        }
+    }
+    var showArtTitle by remember { mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(artTitleUrl) {
+        if (artTitleUrl.isNotBlank()) {
+            val request = ImageRequest.Builder(ctx)
+                .data(artTitleUrl)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .listener(
+                    onSuccess = { _, _ -> showArtTitle = true },
+                    onError = { _, _ -> showArtTitle = false }
+                )
+                .build()
+            imageLoader.enqueue(request)
+        }
+    }
+
     // 【删除】：不再在内部 remember，改用传入的 titleMaxLen 参数
     // val titleMaxLen = remember { SessionPrefs.getTitleMaxLen(ctx) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                title = { Text("FiaGoods", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp)) },
+                title = {
+                    AnimatedContent(
+                        targetState = showArtTitle,
+                        transitionSpec = {
+                            if (targetState) {
+                                (fadeIn() + slideInVertically { height -> height })
+                                    .togetherWith(fadeOut() + slideOutVertically { height -> -height })
+                            } else {
+                                fadeIn().togetherWith(fadeOut())
+                            }
+                        },
+                        label = "TitleAnimation"
+                    ) { show ->
+                        if (show) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(artTitleUrl)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .networkCachePolicy(CachePolicy.ENABLED)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "FiaGoods",
+                                modifier = Modifier.height(28.dp),
+                                contentScale = ContentScale.FillHeight
+                            )
+                        } else {
+                            Text("FiaGoods", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp))
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
@@ -193,7 +260,7 @@ fun HomeScreen(
                     }
                     val orderedList = list.sortedByDescending { favorites.contains(it.id) }
                     val clipboard = LocalClipboardManager.current
-                    val imageLoader = LocalImageLoader.current
+                    val imageLoader = ctx.imageLoader
                     val conf = LocalConfiguration.current
                     val displayList = orderedList
                     var linkUnchangedMap by remember(items) { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
