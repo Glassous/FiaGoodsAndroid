@@ -164,6 +164,7 @@ fun HomeScreen(
         }
     }
     var showArtTitle by remember { mutableStateOf(false) }
+    var displayedArtTitleUrl by remember { mutableStateOf("") }
 
     androidx.compose.runtime.LaunchedEffect(artTitleUrl) {
         if (artTitleUrl.isNotBlank()) {
@@ -172,12 +173,14 @@ fun HomeScreen(
                 .diskCachePolicy(CachePolicy.DISABLED)
                 .memoryCachePolicy(CachePolicy.ENABLED)
                 .networkCachePolicy(CachePolicy.ENABLED)
-                .listener(
-                    onSuccess = { _, _ -> showArtTitle = true },
-                    onError = { _, _ -> showArtTitle = false }
-                )
                 .build()
-            imageLoader.enqueue(request)
+            val result = imageLoader.execute(request)
+            if (result is coil.request.SuccessResult) {
+                displayedArtTitleUrl = artTitleUrl
+                showArtTitle = true
+            } else {
+                showArtTitle = false
+            }
         }
     }
 
@@ -203,7 +206,7 @@ fun HomeScreen(
                         if (show) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
-                                    .data(artTitleUrl)
+                                    .data(displayedArtTitleUrl)
                                     .diskCachePolicy(CachePolicy.DISABLED)
                                     .memoryCachePolicy(CachePolicy.ENABLED)
                                     .networkCachePolicy(CachePolicy.ENABLED)
