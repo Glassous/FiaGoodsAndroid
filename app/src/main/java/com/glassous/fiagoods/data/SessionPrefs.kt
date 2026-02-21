@@ -23,6 +23,7 @@ object SessionPrefs {
     private const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
     private const val KEY_IGNORED_VERSIONS = "ignored_versions"
     private const val KEY_ADS_ENABLED = "ads_enabled"
+    private const val KEY_COPY_COUNTS = "copy_counts"
 
     private fun prefs(context: Context): SharedPreferences {
         val masterKey = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
@@ -98,6 +99,27 @@ object SessionPrefs {
     fun setTitleMaxLen(context: Context, len: Int) {
         val v = len.coerceAtLeast(0)
         prefs(context).edit().putInt(KEY_TITLE_MAX_LEN, v).apply()
+    }
+
+    fun getCopyCounts(context: Context): Map<String, Int> {
+        val json = prefs(context).getString(KEY_COPY_COUNTS, null) ?: return emptyMap()
+        return try {
+            val type = object : com.google.gson.reflect.TypeToken<Map<String, Int>>() {}.type
+            com.google.gson.Gson().fromJson(json, type) ?: emptyMap()
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    fun setCopyCounts(context: Context, counts: Map<String, Int>) {
+        val json = com.google.gson.Gson().toJson(counts)
+        prefs(context).edit().putString(KEY_COPY_COUNTS, json).apply()
+    }
+
+    fun incrementCopyCount(context: Context, id: String) {
+        val counts = getCopyCounts(context).toMutableMap()
+        counts[id] = (counts[id] ?: 0) + 1
+        setCopyCounts(context, counts)
     }
 
     fun getTitleMaxLenLimited(context: Context): Int = prefs(context).getInt(KEY_TITLE_MAX_LEN_LIMITED, 7)

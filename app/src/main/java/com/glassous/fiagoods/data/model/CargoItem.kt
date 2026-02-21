@@ -10,5 +10,6 @@ data class CargoItem(
     @SerializedName("categories") val categories: List<String> = emptyList(),
     @SerializedName("price") val price: Double,
     @SerializedName("link") val link: String,
-    @SerializedName("is_favorite") val isFavorite: Boolean = false
+    @SerializedName("is_favorite") val isFavorite: Boolean = false,
+    @SerializedName("copy_count") val copyCount: Int = 0
 )

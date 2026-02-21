@@ -72,11 +72,52 @@ class GoodsViewModel : ViewModel() {
 
                 val res = withContext(Dispatchers.IO) { api.fetchCargoItems() }
                 val fixed = res.map { it.copy(groupNames = it.groupNames ?: emptyList(), categories = it.categories ?: emptyList()) }
-                _items.value = fixed
-                _favorites.value = fixed.filter { it.isFavorite }.map { it.id }.toSet()
+                
+                // 1. 获取本地记录的次数
+                val localCountsMap = SessionPrefs.getCopyCounts(context).toMutableMap()
+                
+                // 2. 合并逻辑：取 Max(本地, 云端)，并更新本地记录
+                val merged = fixed.map { item ->
+                    val serverCount = item.copyCount
+                    val localCount = localCountsMap[item.id] ?: 0
+                    val finalCount = kotlin.math.max(serverCount, localCount)
+                    
+                    // 更新本地 Map，确保本地总是最新的最大值
+                    if (finalCount > localCount) {
+                        localCountsMap[item.id] = finalCount
+                    }
+                    
+                    item.copy(copyCount = finalCount)
+                }.sortedByDescending { it.copyCount }
+                
+                // 3. 保存合并后的最新次数到本地
+                SessionPrefs.setCopyCounts(context, localCountsMap)
+                
+                // 4. 筛选出需要上传的（本地 > 云端）
+                val toUpload = merged.filter { item ->
+                    val original = fixed.find { it.id == item.id }
+                    val serverCount = original?.copyCount ?: 0
+                    item.copyCount > serverCount
+                }
+                
+                // 5. 异步批量上传差异
+                if (toUpload.isNotEmpty()) {
+                    launch(Dispatchers.IO) {
+                        toUpload.forEach { item ->
+                            try {
+                                api.updateCargoItem(item.id, mapOf("copy_count" to item.copyCount))
+                            } catch (e: Exception) {
+                                // 忽略单个上传失败，下次刷新会重试
+                            }
+                        }
+                    }
+                }
+                
+                _items.value = merged
+                _favorites.value = merged.filter { it.isFavorite }.map { it.id }.toSet()
 
                 try {
-                    val json = gson.toJson(fixed)
+                    val json = gson.toJson(merged)
                     SessionPrefs.setItemsCache(context, json)
                 } catch (_: Exception) { }
             } catch (e: Exception) {
@@ -448,11 +489,33 @@ class GoodsViewModel : ViewModel() {
                 // 【核心修改】：替换匿名内部类，使用 SupabaseApi.TYPE_LIST_CARGO
                 val list = gson.fromJson<List<CargoItem>>(json, SupabaseApi.TYPE_LIST_CARGO) ?: emptyList()
                 val fixed = list.map { it.copy(groupNames = it.groupNames ?: emptyList(), categories = it.categories ?: emptyList()) }
-                if (fixed.isNotEmpty()) {
-                    _items.value = fixed
-                    _favorites.value = fixed.filter { it.isFavorite }.map { it.id }.toSet()
+                
+                val counts = SessionPrefs.getCopyCounts(context)
+                val withCounts = fixed.map { 
+                    val count = counts[it.id] ?: 0
+                    it.copy(copyCount = kotlin.math.max(it.copyCount, count))
+                }.sortedByDescending { it.copyCount }
+
+                if (withCounts.isNotEmpty()) {
+                    _items.value = withCounts
+                    _favorites.value = withCounts.filter { it.isFavorite }.map { it.id }.toSet()
                 }
             } catch (_: Exception) { }
         }
+    }
+
+    fun incrementCopyCount(context: Context, id: String) {
+        SessionPrefs.incrementCopyCount(context, id)
+        val currentItems = _items.value
+        val updatedItems = currentItems.map { 
+            if (it.id == id) {
+                it.copy(copyCount = it.copyCount + 1)
+            } else {
+                it
+            }
+        }
+        // 【优化】：这里不进行重新排序，避免列表瞬间跳动。
+        // 用户下次进入App或刷新时，loadCache/refresh 会读取最新的 counts 并进行排序。
+        _items.value = updatedItems
     }
 }

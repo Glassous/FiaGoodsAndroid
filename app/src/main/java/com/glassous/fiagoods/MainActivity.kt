@@ -259,7 +259,12 @@ class MainActivity : ComponentActivity() {
 
                                 HomeScreen(items = items, loading = loading, onItemClick = { item ->
                                     val json = com.google.gson.Gson().toJson(item)
-                                    startActivity(android.content.Intent(this@MainActivity, DetailActivity::class.java).putExtra("id", item.id).putExtra("item", json))
+                                    val intent = android.content.Intent(this@MainActivity, DetailActivity::class.java)
+                                    intent.putExtra("id", item.id)
+                                    intent.putExtra("item", json)
+                                    startActivity(intent)
+                                }, onItemLongClick = { item ->
+                                    vm.incrementCopyCount(this@MainActivity, item.id)
                                 }, favorites = favorites, onToggleFavorite = { id ->
                                     vm.toggleFavorite(this@MainActivity, id) { }
                                 }, onCreateItemWithImagesAndUrls = { item, uris, urls, onProgress, onDone ->

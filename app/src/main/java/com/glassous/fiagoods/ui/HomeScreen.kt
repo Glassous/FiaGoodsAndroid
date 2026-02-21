@@ -112,6 +112,7 @@ fun HomeScreen(
     items: List<CargoItem>,
     loading: Boolean,
     onItemClick: (CargoItem) -> Unit,
+    onItemLongClick: (CargoItem) -> Unit,
     favorites: Set<String>,
     onToggleFavorite: (String) -> Unit,
     onCreateItemWithImagesAndUrls: (CargoItem, List<Uri>, List<String>, (Int, Int) -> Unit, (Boolean) -> Unit) -> Unit,
@@ -367,6 +368,7 @@ fun HomeScreen(
                                 Card(elevation = CardDefaults.cardElevation(), modifier = Modifier.fillMaxWidth().combinedClickable(onClick = { onItemClick(item) }, onLongClick = {
                                     clipboard.setText(AnnotatedString(item.link))
                                     Toast.makeText(ctx, "链接已复制", Toast.LENGTH_SHORT).show()
+                                    onItemLongClick(item)
                                 })) {
                                     Column {
                                         var previewIndex by remember(item.id) { mutableStateOf(0) }

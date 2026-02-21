@@ -233,7 +233,90 @@ private fun SettingsScreen(mode: String, density: Int, titleMaxLen: Int, onBack:
                 ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("商品总数", style = MaterialTheme.typography.titleMedium)
-                        Text(goodsCount.toString(), style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                        var clickCount by remember { mutableStateOf(0) }
+                        var showStats by remember { mutableStateOf(false) }
+                        
+                        if (showStats) {
+                            androidx.compose.material3.ModalBottomSheet(
+                                onDismissRequest = { showStats = false },
+                                containerColor = MaterialTheme.colorScheme.surface,
+                            ) {
+                                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                                    Text("复制次数统计", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 16.dp))
+                                    
+                                    var statsList by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
+                                    LaunchedEffect(Unit) {
+                                        withContext(Dispatchers.IO) {
+                                            val json = SessionPrefs.getItemsCache(ctx)
+                                            if (!json.isNullOrBlank()) {
+                                                try {
+                                                    val list = Gson().fromJson<List<CargoItem>>(json, SupabaseApi.TYPE_LIST_CARGO)
+                                                    val counts = SessionPrefs.getCopyCounts(ctx)
+                                                    
+                                                    // 合并本地counts和item中的copyCount (取最大值，逻辑同ViewModel)
+                                                    val merged = list.map { item ->
+                                                        val local = counts[item.id] ?: 0
+                                                        val max = kotlin.math.max(item.copyCount, local)
+                                                        item to max
+                                                    }
+                                                    
+                                                    val sorted = merged.sortedByDescending { it.second }
+                                                    val nonZero = sorted.filter { it.second > 0 }
+                                                    val zero = sorted.filter { it.second == 0 }
+                                                    
+                                                    val result = mutableListOf<Pair<String, Int>>()
+                                                    result.addAll(nonZero.map { it.first.description to it.second })
+                                                    if (zero.isNotEmpty()) {
+                                                        result.add("其它 (${zero.size})" to 0)
+                                                    }
+                                                    statsList = result
+                                                } catch (_: Exception) { }
+                                            }
+                                        }
+                                    }
+                                    
+                                    androidx.compose.foundation.lazy.LazyColumn(
+                                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
+                                    ) {
+                                        items(statsList.size) { index ->
+                                            val item = statsList[index]
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    item.first, 
+                                                    maxLines = 1, 
+                                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f).padding(end = 16.dp)
+                                                )
+                                                Text(item.second.toString(), style = MaterialTheme.typography.bodyMedium)
+                                            }
+                                            if (index < statsList.size - 1) {
+                                                androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.padding(bottom = 32.dp))
+                                }
+                            }
+                        }
+
+                        Text(
+                            goodsCount.toString(), 
+                            style = MaterialTheme.typography.titleLarge, 
+                            textAlign = TextAlign.Center, 
+                            modifier = Modifier.fillMaxWidth().clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                clickCount++
+                                if (clickCount >= 5) {
+                                    clickCount = 0
+                                    showStats = true
+                                }
+                            }
+                        )
                     }
                 }
                 ElevatedCard(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)) {
